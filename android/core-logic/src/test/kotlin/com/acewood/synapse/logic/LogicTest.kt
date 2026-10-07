@@ -365,3 +365,52 @@ class ProfilesTest {
         assertEquals(1.25f, back.byId("guest")!!.layout.tileScale)
     }
 }
+
+class RoomsTest {
+    // Mason's real HA areas (from HANDS' map).
+    private val areas = listOf(
+        Area("living_room", "Living Room", listOf(
+            "light.lr_lamp", "switch.lr_lamp", "media_player.living_room_50_onn_roku_tv",
+            "switch.ring_alert", "switch.motion_alert", "switch.hour_ding")),
+        Area("master_bedroom", "Master bedroom", listOf(
+            "light.bedroom", "light.cync_lan_694243630_22", "light.zz_cloud_bedroom_led_strip",
+            "light.zz_cloud_mb_lamp_top", "switch.master_bedroom_jarvis_microphone",
+            "switch.led_strip_led_strip_mitm_mode", "media_player.riahs_room_50_onn_roku_tv")),
+        Area("kids_room", "Kids Room", listOf(
+            "light.cync_lan_694243630_188", "light.zz_cloud_kids_bedroom_light",
+            "switch.kids_bedroom_jarvis_microphone", "media_player.kids_room_juniors_roku")),
+        Area("dining_room", "Dining Room", listOf(
+            "light.cync_lan_694243630_102", "light.zz_cloud_dining_room_light",
+            "switch.dining_room_dining_room_windows_mute")),
+        Area("hallway", "Hallway", listOf("light.cync_lan_694243630_239", "light.zz_cloud_hallway_light")),
+        Area("kitchen", "Kitchen", emptyList()),
+        Area("front_door", "Front door", emptyList()),
+    )
+
+    @Test fun buildsChannelsSkippingKitchenAndEmpty() {
+        val rooms = Rooms.build(areas)
+        assertEquals(listOf("Living Room", "Master bedroom", "Kids Room", "Dining Room", "Hallway"), rooms.map { it.name })
+        assertTrue(rooms.none { it.id == "kitchen" || it.id == "front_door" })
+    }
+    @Test fun hidesCloudTwinLights() {
+        val mb = Rooms.build(areas).first { it.id == "master_bedroom" }
+        assertTrue(mb.lights.none { it.contains("zz_cloud") }, mb.lights.toString())
+        assertTrue(mb.lights.contains("light.bedroom") && mb.lights.contains("light.cync_lan_694243630_22"))
+        val hall = Rooms.build(areas).first { it.id == "hallway" }
+        assertEquals(listOf("light.cync_lan_694243630_239"), hall.lights)   // zz twin hidden
+    }
+    @Test fun classifiesMediaAndExtras() {
+        val lr = Rooms.build(areas).first { it.id == "living_room" }
+        assertEquals("media_player.living_room_50_onn_roku_tv", lr.primaryMedia)
+        assertTrue(lr.switches.contains("switch.lr_lamp"))                 // a real lamp = primary
+        assertTrue(lr.extras.containsAll(listOf("switch.ring_alert", "switch.motion_alert", "switch.hour_ding")))
+        val mb = Rooms.build(areas).first { it.id == "master_bedroom" }
+        assertTrue(mb.extras.contains("switch.master_bedroom_jarvis_microphone"))
+    }
+    @Test fun respectsExplicitOrderAndCanKeepTwins() {
+        val ordered = Rooms.build(areas, RoomsConfig(order = listOf("hallway", "living_room")))
+        assertEquals("Hallway", ordered.first().name)
+        val keepTwins = Rooms.build(areas, RoomsConfig(hideCloudTwins = false)).first { it.id == "hallway" }
+        assertEquals(2, keepTwins.lights.size)
+    }
+}
