@@ -198,3 +198,10 @@ Answer (R-107 is a build, tracked here + the plan doc).
 | Kitchen (`kitchen`) | (none assigned yet) |
 | Front door, 2018 GMC Terrain (+ status monitor) | (no lights/media) |
 Suggestion: build channels from HA **areas** automatically (skip empty ones). There are duplicates: `zz_cloud_*` lights look like cloud twins of the `cync_lan_*` ones, so hide `zz_*` or let Mason pick per room ❓. Each room's Roku = the D-pad target. Mason still to confirm the room order and the home-screen apps.
+
+### R-107 inputs from Mason (2026-10-07) — CONFIRMED
+- **Home-screen apps:** Camera, Settings, Jarvis chat, HA, browser, music (confirmed). Add features/apps as developed.
+- **Wireless app install + access** from: **dining PC** (Windows), **Jarvis = MacBook** (macOS), **RP5** (Raspberry Pi 5). → authorize each machine's ADB key over Wi-Fi; `adb install` / scrcpy / control-API from any of them. See `tools/remote-access/README.md`.
+- **Rooms:** pull from Home Assistant areas. **Exclude the kitchen** (no kitchen devices needed).
+- **Design:** more futuristic/premium — a "Synapse Glass" language (like Apple's visionOS glass, but Synapse's own). Make it pop, high quality. Mason will review the result.
+- **Build:** go — Mason reviews what comes out.
