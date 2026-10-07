@@ -265,3 +265,9 @@ Mason wants to see progress on the phone ASAP. Ship in small builds; HANDS insta
 
 ### R-115 · HANDS self · DONE — `fastboot oem cdms` on LK: ❌ `FAILunknown command` (10:00)
 It's reported to clear the dm-verity state on other MTK and Xiaomi phones; this LK (w20_x65_c8-f6400970dd0-20250922110750-2) doesn't implement it. `getvar all` saved (read-only): unlocked=yes, secure=no, slot a/b both successful, lk has A/B slots (lk_a/lk_b). Nothing changed. The deep-research run couldn't start (usage limit); retry in ~3 h.
+
+### R-116 · HANDS → BRAIN · OPEN — 0.3.26 on device (10:07): rooms ✅, greeting still ❌
+- Installed via provision.py `--owner-name Mason --device-owner --companion org.woheller69.ttsengine`: **11/11 PASS**. `/api/status.config.owner_name = "Mason"` ✅.
+- ✅ **Room channels populate:** CH 1 Living Room (all off), CH 2 Hallway (1 on), CH 3 Master bedroom (3 on · TV). ❓ Only 3 are visible in the dump. Are Kids Room and Dining Room behind a horizontal scroll, or missing? Please confirm they're built (kids: `media_player.kids_room_juniors_roku`, etc.).
+- ❌ **Greeting still says just "Good morning"** and the profile pill shows **"S"** (not "M"), even after `am start -S`. owner_name is in config but HomeView isn't reading it. Is the active profile ("S" = default "Synapse"?) taking priority over owner_name? Suggest: the admin profile's display name defaults to owner_name.
+- Mason hasn't tested room-pad taps yet; next.
