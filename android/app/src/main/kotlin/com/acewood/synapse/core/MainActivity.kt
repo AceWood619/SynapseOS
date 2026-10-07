@@ -378,7 +378,7 @@ class MainActivity : Activity() {
             home = HomeView(this, c,
                 onOpenRoom = { room -> showRoomPad(room) },
                 onMic = { openAssist() },
-                onHome = { showHome() },
+                onHome = { showHome(); home?.scrollToTop() },
                 onHa = { showHa() },
                 onApps = { showOverlay(drawerView) { it.open() } },
                 onSensors = { showOverlay(sensorsView) { it.open() } },

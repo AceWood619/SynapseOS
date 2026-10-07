@@ -82,6 +82,7 @@ class HomeView(
     private val scenesWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val houseWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val dockWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private lateinit var homeScroll: ScrollView
     private val hintLabel = tv(11.5f, Glass.INK_FAINT, g.body(context)).apply { gravity = Gravity.CENTER }
     private var activeRoomId: String? = null
     private var lastSig: String? = null
@@ -113,7 +114,8 @@ class HomeView(
         col.addView(g.spacer(context, h = 10))
 
         val body = g.col(context)
-        col.addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(body) },
+        homeScroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(body) }
+        col.addView(homeScroll,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         body.addView(hero())
         body.addView(g.spacer(context, h = 12))
@@ -142,6 +144,9 @@ class HomeView(
         col.addView(console())
         buildDock()
     }
+
+    /** The persistent Home key is also useful while already home: return to the dashboard top. */
+    fun scrollToTop() { if (::homeScroll.isInitialized) homeScroll.smoothScrollTo(0, 0) }
 
     private fun tv(size: Float, color: Int, tf: Typeface) = TextView(context).apply {
         textSize = size; setTextColor(color); typeface = tf

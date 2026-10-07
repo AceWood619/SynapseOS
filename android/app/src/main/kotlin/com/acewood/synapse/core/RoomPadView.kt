@@ -157,8 +157,11 @@ class RoomPadView(
             section("FANS", m.fans.map { fanCard(it) })
             section("COVERS", m.covers.map { coverCard(it) })
             section("LOCKS", m.locks.map { lockCard(it) })
-            val (settings, switches) = m.extras.partition { it.entityId.contains("ivy", true) ||
-                it.name.contains("alert", true) || it.name.contains("ding", true) || it.name.contains("motion", true) }
+            // Ivy devices are user-facing room controls, not hidden alert settings. Keep only
+            // alert/ding/motion helpers folded so Ivy switches remain visible in the room pad.
+            val (settings, switches) = m.extras.partition {
+                it.name.contains("alert", true) || it.name.contains("ding", true) || it.name.contains("motion", true)
+            }
             section("SWITCHES", switches.map { toggleCard(it) })
             if (settings.isNotEmpty()) addCard(settingsFold(settings))
             if (m.sensors.isNotEmpty()) { sectionLabel("SENSORS"); addCard(sensorWrap(m.sensors)) }
