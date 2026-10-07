@@ -472,3 +472,95 @@ class RoomOrderTest {
         assertEquals(listOf("Kids Room", "Master bedroom", "Living Room"), ordered.map { it.name })
     }
 }
+
+class MediaRemoteTest {
+    @Test fun dpadGoesToRemoteAsRokuKeys() {
+        val c = MediaRemote.press(MediaRemote.Button.OK, remoteEntityId = "remote.living_roku", mediaEntityId = "media_player.living_roku")!!
+        assertEquals("remote", c.domain)
+        assertEquals("send_command", c.service)
+        assertEquals("remote.living_roku", c.entityId)
+        assertEquals("Select", c.data["command"])
+        assertEquals("Up", MediaRemote.press(MediaRemote.Button.UP, "remote.r", null)!!.data["command"])
+        assertEquals("InstantReplay", MediaRemote.press(MediaRemote.Button.REPLAY, "remote.r", null)!!.data["command"])
+    }
+    @Test fun withoutRemoteOnlyTransportFallsBackToMediaPlayer() {
+        // navigation keys have no media_player equivalent
+        assertNull(MediaRemote.press(MediaRemote.Button.UP, null, "media_player.x"))
+        assertNull(MediaRemote.press(MediaRemote.Button.OK, null, "media_player.x"))
+        // transport keys map onto the media_player
+        assertEquals("media_play_pause", MediaRemote.press(MediaRemote.Button.PLAY, null, "media_player.x")!!.service)
+        assertEquals("media_next_track", MediaRemote.press(MediaRemote.Button.FWD, null, "media_player.x")!!.service)
+        // nothing to drive at all
+        assertNull(MediaRemote.press(MediaRemote.Button.PLAY, null, null))
+    }
+    @Test fun transportHelpers() {
+        assertEquals("volume_mute", MediaRemote.mute("media_player.x", true).service)
+        assertEquals(true, MediaRemote.mute("media_player.x", true).data["is_volume_muted"])
+        assertEquals("turn_off", MediaRemote.power("media_player.x", on = false).service)
+    }
+}
+
+class RoomControlTest {
+    private fun cache(vararg e: Entity) = EntityCache().apply { applyStates(e.toList()) }
+
+    @Test fun pairsLocalCloudAndReadsBrightness() {
+        val room = Rooms.build(listOf(Area("living_room", "Living Room",
+            listOf("light.cync_lan_123456_1", "light.zz_cloud_living_lamp")))).first()
+        val c = cache(
+            Entity("light.cync_lan_123456_1", "on", mapOf("brightness" to 128.0, "supported_color_modes" to listOf("brightness"))),
+            Entity("light.zz_cloud_living_lamp", "on", emptyMap()))
+        val m = RoomControl.build(room, c)
+        assertEquals(1, m.lights.size)              // local+cloud fused into one tile
+        assertFalse(m.lightsAmbiguous)
+        assertTrue(m.lights[0].isOn)
+        assertTrue(m.lights[0].dimmable)
+        assertEquals(50, m.lights[0].brightnessPct) // 128/255 ≈ 50%
+        assertTrue(m.anyLightOn)
+    }
+    @Test fun onoffLightIsNotDimmable() {
+        val room = Rooms.build(listOf(Area("hall", "Hall", listOf("light.porch")))).first()
+        val c = cache(Entity("light.porch", "off", mapOf("supported_color_modes" to listOf("onoff"))))
+        val t = RoomControl.build(room, c).lights.single()
+        assertFalse(t.dimmable)
+        assertNull(t.brightnessPct)
+        assertFalse(t.isOn)
+    }
+    @Test fun rokuMediaGetsDpadAndRemote() {
+        val room = Rooms.build(listOf(Area("den", "Den",
+            listOf("media_player.den_roku", "remote.den_roku")))).first()
+        val c = cache(Entity("media_player.den_roku", "playing",
+            mapOf("supported_features" to 16384.0 + 32 + 4, "media_title" to "The Mandalorian", "volume_level" to 0.4, "app_name" to "Disney+")))
+        val mt = RoomControl.build(room, c).media.single()
+        assertTrue(mt.showDpad)
+        assertEquals("remote.den_roku", mt.remoteEntityId)
+        assertTrue(mt.isPlaying)
+        assertTrue(mt.canTransport)
+        assertEquals("The Mandalorian", mt.title)
+        assertEquals(40, mt.volumePct)
+    }
+    @Test fun plainMediaNoDpadNoRemote() {
+        val room = Rooms.build(listOf(Area("office", "Office", listOf("media_player.sonos")))).first()
+        val c = cache(Entity("media_player.sonos", "paused", mapOf("supported_features" to 1.0 /* PAUSE only */)))
+        val mt = RoomControl.build(room, c).media.single()
+        assertFalse(mt.showDpad)
+        assertNull(mt.remoteEntityId)
+        assertNull(mt.volumePct)            // no VOLUME_SET/STEP bit
+        assertTrue(mt.canTransport)         // PAUSE counts
+        assertFalse(mt.isPlaying)
+    }
+    @Test fun unavailableLightFlagged() {
+        val room = Rooms.build(listOf(Area("bed", "Bed", listOf("light.bedside")))).first()
+        val c = cache(Entity("light.bedside", "unavailable", emptyMap()))
+        val t = RoomControl.build(room, c).lights.single()
+        assertFalse(t.available)
+        assertFalse(t.isOn)
+    }
+    @Test fun switchesAndExtrasBecomeToggles() {
+        val room = Rooms.build(listOf(Area("living_room", "Living Room",
+            listOf("switch.lamp", "switch.jarvis_microphone")))).first()
+        val c = cache(Entity("switch.lamp", "on", emptyMap()), Entity("switch.jarvis_microphone", "off", emptyMap()))
+        val m = RoomControl.build(room, c)
+        assertEquals(2, m.extras.size)
+        assertTrue(m.extras.any { it.name.contains("lamp", ignoreCase = true) && it.isOn })
+    }
+}
