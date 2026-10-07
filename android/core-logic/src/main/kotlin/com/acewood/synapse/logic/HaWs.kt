@@ -41,6 +41,16 @@ object HaWs {
         return Json.write(m)
     }
 
+    /** Start an Assist microphone run; PCM arrives afterward as binary frames. */
+    fun assistPipelineMessage(id: Long, sampleRate: Int = 16_000): String =
+        Json.write(linkedMapOf(
+            "id" to id, "type" to "assist_pipeline/run", "start_stage" to "stt",
+            "end_stage" to "intent", "input" to linkedMapOf("sample_rate" to sampleRate)
+        ))
+
+    fun assistPipelineStopMessage(id: Long, runnerId: String): String =
+        Json.write(linkedMapOf("id" to id, "type" to "assist_pipeline/stop", "runner_id" to runnerId))
+
     /** Pull the spoken reply + conversation id out of a conversation/process result. */
     @Suppress("UNCHECKED_CAST")
     fun conversationReply(result: Map<String, Any?>?): Pair<String, String?> {
@@ -63,6 +73,7 @@ object HaWs {
                           val obj: Map<String, Any?>? = null) : Frame()
         /** A state_changed event carrying the entity's new state (null if the entity was removed). */
         data class StateChanged(val entity: Entity?) : Frame()
+        data class AssistEvent(val id: Long, val eventType: String, val data: Map<String, Any?>?) : Frame()
         object Pong : Frame()
         data class Other(val type: String) : Frame()
     }
@@ -89,7 +100,10 @@ object HaWs {
                 if (event?.get("event_type") == "state_changed") {
                     val data = event["data"] as? Map<String, Any?>
                     Frame.StateChanged(Entity.fromState(data?.get("new_state") as? Map<String, Any?>))
-                } else Frame.Other(event?.get("event_type") as? String ?: "event")
+                } else {
+                    val id = (m["id"] as? Double)?.toLong() ?: -1
+                    Frame.AssistEvent(id, event?.get("type") as? String ?: "event", event?.get("data") as? Map<String, Any?>)
+                }
             }
             else -> Frame.Other(m["type"] as? String ?: "unknown")
         }

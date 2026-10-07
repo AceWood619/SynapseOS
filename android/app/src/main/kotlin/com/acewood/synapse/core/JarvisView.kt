@@ -2,10 +2,9 @@ package com.acewood.synapse.core
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
@@ -18,6 +17,8 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.acewood.synapse.logic.AssistPipeline
+import com.acewood.synapse.logic.AssistVad
 
 /**
  * Jarvis chat: type (or tap a quick prompt) and Home Assistant's Assist pipeline answers. It's the same
@@ -34,7 +35,10 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
     private var conversationId: String? = null
     private var speakReplies = true
     private var speech: Speech? = null
-    private var recognizer: SpeechRecognizer? = null
+    @Volatile private var recording = false
+    private var audioRecord: AudioRecord? = null
+    private var audioThread: Thread? = null
+    private var micKey: TextView? = null
     private val speakKey = TextView(context)
 
     private val prompts = listOf(
@@ -90,7 +94,8 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
             addView(g.spacer(context, w = 8))
             addView(key("SEND", Glass.BLUE) { sendInput() })
             addView(g.spacer(context, w = 8))
-            addView(key("MIC", Glass.VIOLET) { hideKeyboard(); onVoice() })
+            micKey = key("MIC", Glass.VIOLET) { hideKeyboard(); if (recording) stopVoice() else onVoice() } as TextView
+            addView(micKey)
         })
         bubble("Hi, I'm Jarvis. Tap a suggestion or type a command.", mine = false)
     }
@@ -123,34 +128,59 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
         }
     }
 
-    /** Starts Android speech recognition, then routes the transcript through HA conversation/process. */
+    /** Streams the microphone to Home Assistant's Wyoming-backed Assist pipeline. */
     fun beginVoice() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            bubble("No speech recognizer is installed.", mine = false); return
+        if (recording) { stopVoice(); return }
+        input.hint = "Listening to HA Assist…"
+        micKey?.text = "STOP"
+        bubble("Listening…", mine = false)
+        HaRepository.startAssist(
+            onReady = { handlerId -> post { startAudio(handlerId) } },
+            onEvent = { type, data -> post { handleAssistEvent(type, data) } },
+            onError = { message -> post { recording = false; micKey?.text = "MIC"; input.hint = "Message Jarvis…"; bubble(message, mine = false) } },
+        )
+    }
+
+    private fun startAudio(handlerId: Int) {
+        if (recording) return
+        val min = AudioRecord.getMinBufferSize(AssistPipeline.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        if (min <= 0) { HaRepository.stopAssist(); input.hint = "Message Jarvis…"; micKey?.text = "MIC"; bubble("The microphone is unavailable.", mine = false); return }
+        val record = AudioRecord(MediaRecorder.AudioSource.MIC, AssistPipeline.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT, (min * 2).coerceAtLeast(4096))
+        audioRecord = record; recording = true
+        record.startRecording()
+        audioThread = Thread {
+            val samples = ShortArray(1024); val vad = AssistVad()
+            while (recording) {
+                val count = record.read(samples, 0, samples.size)
+                if (count <= 0) continue
+                val pcm = ByteArray(count * 2)
+                for (i in 0 until count) { pcm[i * 2] = (samples[i].toInt() and 0xff).toByte(); pcm[i * 2 + 1] = (samples[i].toInt() shr 8).toByte() }
+                HaRepository.sendAssistAudio(handlerId, pcm)
+                if (vad.accept(pcm).shouldStop) post { stopVoice() }
+            }
+        }.apply { name = "synapse-assist-mic"; start() }
+    }
+
+    private fun handleAssistEvent(type: String, data: Map<String, Any?>?) {
+        when (type) {
+            "stt-end" -> input.hint = "Jarvis is thinking…"
+            "intent-end" -> {
+                val reply = AssistPipeline.speechFromIntent(data) ?: "I didn't get a response from Home Assistant."
+                bubble(reply, mine = false)
+                if (speakReplies) { val s = speech ?: Speech(context.applicationContext).also { speech = it }; try { s.speak(reply) } catch (_: Exception) {} }
+                input.hint = "Message Jarvis…"; micKey?.text = "MIC"
+            }
+            "run-end", "error" -> { recording = false; input.hint = "Message Jarvis…"; micKey?.text = "MIC" }
         }
-        recognizer?.destroy()
-        recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { r ->
-            r.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: android.os.Bundle?) { input.hint = "Listening…" }
-                override fun onBeginningOfSpeech() { input.hint = "Listening…" }
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() { input.hint = "Processing…" }
-                override fun onError(error: Int) { input.hint = "Message Jarvis…"; bubble("I couldn't hear that (voice error $error).", mine = false) }
-                override fun onResults(results: android.os.Bundle?) {
-                    input.hint = "Message Jarvis…"
-                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                    if (text.isNotBlank()) send(text) else bubble("I didn't catch a command.", mine = false)
-                }
-                override fun onPartialResults(partialResults: android.os.Bundle?) {}
-                override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
-            })
-            r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            })
-        }
+    }
+
+    private fun stopVoice() {
+        if (!recording) { HaRepository.stopAssist(); return }
+        recording = false
+        try { audioRecord?.stop() } catch (_: Exception) {}
+        audioRecord?.release(); audioRecord = null; audioThread = null
+        HaRepository.stopAssist(); input.hint = "Processing…"; micKey?.text = "MIC"
     }
 
     private fun bubble(text: String, mine: Boolean): TextView {
@@ -188,5 +218,5 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
         try { (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0) } catch (_: Exception) {}
     }
 
-    fun close() { hideKeyboard(); recognizer?.destroy(); recognizer = null; try { speech?.shutdown() } catch (_: Exception) {}; speech = null }
+    fun close() { hideKeyboard(); stopVoice(); try { speech?.shutdown() } catch (_: Exception) {}; speech = null }
 }

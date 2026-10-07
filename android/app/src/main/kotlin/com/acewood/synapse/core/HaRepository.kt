@@ -77,6 +77,12 @@ object HaRepository {
         if (c == null) onReply("Home Assistant isn't connected right now.", conversationId) else c.converse(text, conversationId, onReply)
     }
 
+    fun startAssist(onReady: (Int) -> Unit, onEvent: (String, Map<String, Any?>?) -> Unit, onError: (String) -> Unit) {
+        client?.startAssist(onReady, onEvent, onError) ?: onError("Home Assistant isn't connected right now.")
+    }
+    fun sendAssistAudio(handlerId: Int, pcm: ByteArray) { client?.sendAssistAudio(handlerId, pcm) }
+    fun stopAssist() { client?.stopAssist() }
+
     /** Select the hand-picked room, set the discovered message helper, then run the HA script. */
     fun sendIntercom(target: IntercomTarget, room: String, message: String): Boolean {
         val text = message.trim()

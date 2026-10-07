@@ -30,7 +30,23 @@ class JsonTest {
         assertFailsWith<IllegalArgumentException> { Json.parseObject("[1]") }
     }
 }
-
+class AssistPipelineTest {
+    @Test fun prefixesPcmWithHandlerByte() {
+        assertEquals(listOf(7.toByte(), 1.toByte(), 2.toByte()), AssistPipeline.binaryFrame(7, byteArrayOf(1, 2)).toList())
+        assertEquals(255.toByte(), AssistPipeline.binaryFrame(511, byteArrayOf()).single())
+    }
+    @Test fun vadStopsAfterSpeechAndSilence() {
+        val vad = AssistVad(threshold = 10.0, requiredSilenceMs = 10)
+        val loud = ByteArray(640) { if (it % 2 == 0) 80 else 0 }
+        assertTrue(vad.accept(loud).speechStarted)
+        assertFalse(vad.accept(ByteArray(160)).shouldStop)
+        assertTrue(vad.accept(ByteArray(160)).shouldStop)
+    }
+    @Test fun extractsAssistSpeechFromIntentPayload() {
+        val data = mapOf("intent_output" to mapOf("response" to mapOf("speech" to mapOf("plain" to mapOf("speech" to "Lights are on")))))
+        assertEquals("Lights are on", AssistPipeline.speechFromIntent(data))
+    }
+}
 class NodeConfigTest {
     private val good = """{"node_id":"Living Room 01","room":"Living Room","ha_url":"http://homeassistant.local:8123/",
         "ha_token":"abcdefghijklmnopqrstuvwxyz0123","api_key":"0123456789abcdef","pin":"2468"}"""
