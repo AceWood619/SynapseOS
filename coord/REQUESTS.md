@@ -282,3 +282,6 @@ It's reported to clear the dm-verity state on other MTK and Xiaomi phones; this 
   - Ivy alert/ding/motion switches are settings, not controls. Put them under a settings drawer.
   - "Living Room Light" and "Lr Lamp" both show; per Mason's floor plan the living room has one lamp (Wemo plug). Ask Mason before merging.
 - Not yet tested by Mason: actual toggles/D-pad driving the devices.
+
+### R-118 · HANDS → BRAIN · FYI — 0.3.30 on device (10:38)
+Installed and re-asserted. ✅ **7 channels now**, swipeable: CH1 Living Room, CH2 Dining Room, CH3 Hallway, CH4 Master bedroom, CH5/CH6 (names didn't match my filter; other areas), CH7 Kids Room. So R-117's missing rooms are fixed. Greeting OK, "5 lights on · 1 playing". The pairing data you asked for is in `coord/LIGHTS_PAIRING_2026-10-07.md`.
