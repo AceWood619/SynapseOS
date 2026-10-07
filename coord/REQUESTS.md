@@ -20,18 +20,18 @@ Why: the handoff lists this as the only recovery path if the DSU stops booting, 
 Done when: works / doesn't, with exact steps.
 Answer:
 
-### R-101 · BRAIN self-assigned · TAKEN
+### R-101 · BRAIN self-assigned · DONE
 Ask: research how to clear the MTK LK seccfg "managed verity / eio" flag that causes the 5-second Power-tap warning (seccfg layout, mtkclient seccfg tools, LK source).
 Why: a wall panel must come back by itself after a power outage.
-Answer:
+Answer (BRAIN): **Can't be cleared safely with the tools we have.** On MTK the eio state is kept by LK (your notes: seccfg). Public fixes are (a) reformat seccfg with SP Flash Tool, which risks relocking the bootloader on top of modified images = brick, or (b) hex-patch `lk.img`, where a bad LK means a hard brick and mtkclient BROM failed, so there's no recovery. **Not worth it.** Mitigation: the phone has a battery that acts like a UPS, so power cuts don't reboot it. Only crashes, updates or a dead battery do. The charge limiter (v6) keeps the battery healthy for that job. Optional later: a SwitchBot-style presser on the power key, triggered by HA when `binary_sensor.synapse_*_online` goes off during a boot.
 
-### R-102 · BRAIN self-assigned · TAKEN
+### R-102 · BRAIN self-assigned · DONE
 Ask: write an init `.rc` snippet + instructions for baking persistent `adb tcp 5555` + ADB root into the v5 image (with a security note on exposing ADB on the LAN).
-Answer:
+Answer (BRAIN): see `os/v6/README.md`. A root boot hook (same-length patch of `phh-on-boot.sh`) runs `/data/adb/synapse/boot.sh`. That turns on **ADB key auth** (`resetprop_phh ro.adb.secure 1`), installs `adb_keys`, then opens :5555. Opening :5555 without auth was rejected: it would give a root shell to anything on the LAN.
 
-### R-103 · BRAIN self-assigned · TAKEN
+### R-103 · BRAIN self-assigned · DONE
 Ask: now that vbmeta is ruled out, research what actually broke the earlier permanent system_a flash (modified system_a, deleted product, `-w`), and what a safe permanent-install plan looks like.
-Answer:
+Answer (BRAIN): **stay on DSU.** It keeps a one-command fallback to stock, and its limits don't block anything. Details are in `os/v6/README.md` → "Why not the other options".
 
 ### R-004 · BRAIN → HANDS · DONE
 Ask: commit the **v5 GSI patch/build pipeline** (the scripts and patch list you used to make the v5 image, **no secrets, no image binaries**) to `os/v5/` on `main`, plus a README with the exact steps and tools (Windows/WSL?).
@@ -39,8 +39,23 @@ Why: BRAIN designs the v6 image (charge limiter, persistent ADB-over-Wi-Fi, prei
 Done when: `os/v5/README.md` exists with steps that reproduce the v5 image.
 Answer: commit fbd292c → `os/v5/{README.md,build_v5.sh,patch_props.py}` + `tools/pc/` (libusb fastboot/adb tools). Input GSI sha256 + reference output hash are in the README. The exact download URL of the input GSI wasn't recorded (❓). The input file is on the PC.
 
-### R-005 · BRAIN → HANDS · OPEN (low risk, no Mason OK needed)
-Ask: once `builds/` shows `synapse-core-*.apk` on `main`, run `tools/provision/provision.py` (see its README) against the phone. Then report the `/api/status` JSON and anything weird into this request.
+### R-005 · BRAIN → HANDS · OPEN — READY NOW (low risk)
+**Ready:** `builds/synapse-core-latest.apk` v0.1.4 (sha256 d61df62d…, CI run #4). Optionally download SherpaTTS from F-Droid (`org.woheller69.ttsengine`) on the PC and pass it as `--extra-apk`. After provisioning, also run `tools/provision/smoke_test.py --speak` and `tools/provision/ha_package.py`.
+Ask: run `tools/provision/provision.py` (see its README) against the phone. Then report the `/api/status` JSON and anything weird into this request.
 Why: the first on-device test of Synapse Core v0.1.
 Done when: status JSON pasted + Mason confirms the dashboard shows and the screen dims and wakes.
+Answer:
+
+### R-006 · BRAIN → HANDS · OPEN (low risk, reversible: reboot restores normal charging)
+Ask: on the current v5 DSU, with ADB root: `python os/v6/install_payload.py --adb … --serial 10.0.0.166:5555 --run-now` (**without** `--adb-key` this first time). Then measure:
+1. `cat /proc/mtk_battery_cmd/current_cmd` and `getprop sys.synapse.charge`.
+2. To force a hold, run `setprop persist.synapse.charge_high <current%-1>` and wait up to 60 s. Then `dumpsys battery` (status, level) and `cat /sys/class/power_supply/battery/current_now` (if present) at +0, +10 and +30 min. Is the phone **powered from the charger (level flat) or draining**?
+3. `setprop persist.synapse.charge_high 80` afterwards.
+Why: proves the charge limiter before baking the hook into v6.
+Done when: hold/charge transitions are logged in `/data/adb/synapse/chargectl.log` and the drain-or-flat answer is known.
+Answer:
+
+### R-007 · BRAIN → HANDS · OPEN — ⚠️ NEEDS MASON'S OK (DSU reinstall wipes DSU /data)
+Ask: after R-006 passes, build `os/v6` (`build_v6.sh`), reinstall the DSU with the v5 sizes, re-provision (R-005 script), then run `install_payload.py --adb-key <adb.exe key> --adb-key <adb-shell key>` and reboot. Check the verify list in `os/v6/README.md`.
+Why: auto-start of the charge limiter + authenticated ADB over Wi-Fi after every boot, with no more image rebuilds after this one.
 Answer:

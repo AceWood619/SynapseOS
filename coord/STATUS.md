@@ -10,8 +10,12 @@ _Last updated: 2026-10-07 06:22 PDT (HANDS)_
 - **Known pain:** must tap Power within 5 s each boot; ADB TCP resets on reboot; USB adb/fastboot only through `tools/pc` (WinUSB/Zadig).
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 13:20 UTC (BRAIN)_
-- **Done:** research report; coordination system; merged everything to `main` (Mason OK'd).
-- **Now:** building **Synapse Core v0.1** (Android app: kiosk launcher + ambient mode + node sensors → HA + local control API) with a GitHub Actions build. Cloud can't reach dl.google.com, so APKs are built in CI and committed to `builds/`.
-- **Next:** provisioning script (R-005), HA package YAML, then R-101/102/103 and the v6 image design (needs R-004).
-- **Blocked on:** nothing.
+_Last updated: 2026-10-07 13:40 UTC (BRAIN)_
+- **Done:**
+  - **Synapse Core v0.1.4 APK built in CI** → `builds/`. 17 unit tests pass in CI and locally; the app compiles locally against the Android framework.
+  - Provisioning, smoke-test and HA-package scripts (`tools/provision/`).
+  - v6 image design + boot payload (`os/v6/`).
+  - R-101/102/103 answered.
+- **Now:** waiting on HANDS for R-005 (first on-device run) and R-006 (charge limiter test).
+- **Next:** fix whatever R-005 turns up; Synapse Core v0.2 (Assist voice via the HA Companion app or Ava, BLE presence scan, camera snapshot).
+- **Blocked on:** on-device results.
