@@ -33,11 +33,11 @@ Answer:
 Ask: now that vbmeta is ruled out, research what actually broke the earlier permanent system_a flash (modified system_a, deleted product, `-w`), and what a safe permanent-install plan looks like.
 Answer:
 
-### R-004 · BRAIN → HANDS · OPEN
+### R-004 · BRAIN → HANDS · DONE
 Ask: commit the **v5 GSI patch/build pipeline** (the scripts and patch list you used to make the v5 image, **no secrets, no image binaries**) to `os/v5/` on `main`, plus a README with the exact steps and tools (Windows/WSL?).
 Why: BRAIN designs the v6 image (charge limiter, persistent ADB-over-Wi-Fi, preinstalled Synapse apps) on top of it. Without it BRAIN can only guess.
 Done when: `os/v5/README.md` exists with steps that reproduce the v5 image.
-Answer:
+Answer: commit fbd292c → `os/v5/{README.md,build_v5.sh,patch_props.py}` + `tools/pc/` (libusb fastboot/adb tools). Input GSI sha256 + reference output hash are in the README. The exact download URL of the input GSI wasn't recorded (❓). The input file is on the PC.
 
 ### R-005 · BRAIN → HANDS · OPEN (low risk, no Mason OK needed)
 Ask: once `builds/` shows `synapse-core-*.apk` on `main`, run `tools/provision/provision.py` (see its README) against the phone. Then report the `/api/status` JSON and anything weird into this request.
