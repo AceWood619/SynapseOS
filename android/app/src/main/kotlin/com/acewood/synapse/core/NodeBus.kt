@@ -25,6 +25,6 @@ object NodeBus {
     fun removeEvent(l: (Event) -> Unit) { eventListeners.remove(l) }
 
     /** Delivered on the main thread. */
-    fun send(c: Command) = main.post { commandListeners.forEach { it(c) } }
-    fun emit(e: Event) = main.post { eventListeners.forEach { it(e) } }
+    fun send(c: Command) { main.post { commandListeners.forEach { it(c) } } }
+    fun emit(e: Event) { main.post { eventListeners.forEach { it(e) } } }
 }

@@ -31,7 +31,13 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace :core-logic:test :app:assembleRelease
+          set -o pipefail
+          ./gradlew --no-daemon :core-logic:test :app:assembleRelease 2>&1 | tee build.log
+
+      - name: Show compiler errors
+        if: failure()
+        working-directory: android
+        run: grep -E "^e: |error:|FAILED|What went wrong" -A3 build.log | head -80 || true
 
       - name: Upload test reports
         if: always()
