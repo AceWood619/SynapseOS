@@ -90,7 +90,7 @@ class RoomPadView(
     private fun lightKey(t: RoomControl.LightTile): View = g.row(context).apply {
         background = g.tile(context, Glass.AMBER, t.isOn, 16f)
         setPadding(g.dp(context, 15f), g.dp(context, 13f), g.dp(context, 13f), g.dp(context, 13f))
-        val targets = { t.light.commandTargets(HaRepository.cache!!, both = false) }
+        val targets = { HaRepository.cache?.let { t.light.commandTargets(it, both = false) } ?: t.light.entityIds }
         addView(g.col(context).apply {
             addView(tv(15f, Glass.INK, g.body(context)).apply { text = t.light.name; setTypeface(typeface, Typeface.BOLD) })
             addView(tv(11f, if (t.isOn) Glass.AMBER else Glass.INK_FAINT, g.body(context)).apply {

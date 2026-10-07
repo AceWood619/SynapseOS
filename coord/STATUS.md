@@ -10,11 +10,15 @@ _Last updated: 2026-10-07 09:25 PDT (HANDS)_
 - **Known pain:** Power tap within 5 s each boot (R-101, won't fix). Zadig WinUSB on 0E8D:201C → stock fastboot.exe can't see LK; fastbootd (18D1:4EE0) still uses stock fastboot.exe.
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 16:45 UTC (BRAIN)._
-- **NATIVE GLASS HOME SCREEN IS BUILT.** HomeView.kt renders the native dashboard (greeting + live hero, lights/media summary, smart-ordered room "channels", HA scenes, Home·mic·All-off thumb console) in Views, Glass-styled, haptic, optimistic scene/all-off over the WS. MainActivity shows it as the default page; the HA Lovelace web page is now just the "HA" tab.
-- **Live data layer done & building:** `HaWsClient` (OkHttp WebSocket, auth, reconnect backoff) + `HaRepository` singleton feeding the UI. Fixed a cross-module smart-cast that broke CI runs 21 & 22; **run 23 (commit 6907577) is building now** — APK will carry the native home screen.
-- Added okhttp to `compile-check` so this bug class is caught locally, not in CI.
-- **R-107 foundations (tested):** HA WebSocket + EntityCache; multi-user Profiles/roles; Rooms model from Mason's real HA areas; RoomOrder (smart ordering); ResilientLight (local+cloud failover, one switch).
-- **Next (BRAIN):** verify run 23 green → hand APK to HANDS to install + screenshot. Then room-pad swipe (room-as-channel), media D-pad, PIN/profile lock screen, launcher/app-drawer.
-- **➡️ HANDS:** once run 23 is green, pull `builds/synapse-core-latest.apk`, install on the phone, and screenshot the new native home screen for Mason (this is his #1: "it's not on the phone yet"). Config now has `roomOrder` (empty = auto smart order; fine to leave empty).
-- **Need from Mason:** reaction to the native home screen on-device; master-bedroom twin-light mapping; logo approval.
+_Last updated: 2026-10-07 17:10 UTC (BRAIN)._
+- **FULL R-107 UI BATCH SHIPPED** (one APK, see latest `builds/synapse-core-latest.json`):
+  - **Native Glass home** — greeting + live hero, lights/media summary, smart-ordered room channels, scenes, Home·mic·All-off console. (HANDS confirmed it renders, 0.3.23.)
+  - **R-113 #1 fixed** — greeting uses `owner_name` ("Good morning, Mason") not the node id. **HANDS: re-push config with `provision.py … --owner-name Mason` (config-only).**
+  - **R-113 #2 fixed** — room channels now populate from HA's area/entity/device registries fetched live over the WS (`HaRegistry`). Kitchen auto-excluded. No hand map, no re-provision.
+  - **Room pads** — tap a channel → `RoomPadView`: light keys (tap=toggle, −/+=dim), media transport+volume, **Roku D-pad**, extra toggles. Back = home.
+  - **HA round-trip** — "HA" chip on home opens Lovelace; floating "⌂ SYNAPSE" button over the webview returns home (HA no longer a dead end).
+- **Data layer:** `HaWsClient` (OkHttp WS, auth, reconnect, registry fetch) + `HaRepository` singleton. okhttp added to `compile-check`.
+- **Tested:** ~59 core-logic unit tests green (HaRegistry, RoomControl, MediaRemote, owner_name, …); full app type-checks locally every push.
+- **➡️ HANDS:** install the latest `builds/synapse-core-latest.apk` (check the json version/sha first). After update, re-assert Synapse as home (R-112 note). Then the batch is ready for Mason to use on-device.
+- **⏸️ BRAIN holding** for Mason's on-device reaction before the next stack: PIN/profile lock screen (multi-user), app drawer (Camera/Settings/Jarvis/browser/music), Glass wallpaper.
+- **Need from Mason:** reaction to the full batch; **master-bedroom light mapping** (several cloud+local bulbs can't be auto-paired safely — which local pairs with which cloud?); logo approval.
