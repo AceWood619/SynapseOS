@@ -20,6 +20,8 @@ data class NodeConfig(
     val bleKnown: Map<String, String> = emptyMap(),
     /** Camera snapshots over the control API. Off by default (privacy). "back" or "front". */
     val camera: String = "",
+    /** preferred base room order (ids); the smart ordering uses this to break ties */
+    val roomOrder: List<String> = emptyList(),
 ) {
     val slug: String get() = EntityIds.slug(nodeId)
     val dashboardUrl: String get() = haUrl.trimEnd('/') + "/" + dashboardPath.trimStart('/')
@@ -46,6 +48,7 @@ data class NodeConfig(
             "ambient_brightness" to ambientBrightness.toDouble(), "pin" to pin, "api_port" to apiPort,
             "api_key" to apiKey, "heartbeat_seconds" to heartbeatSeconds, "kiosk" to kiosk,
             "companion_apps" to companionApps, "ble_known" to bleKnown, "camera" to camera,
+            "room_order" to roomOrder,
         )
     )
 
@@ -85,6 +88,7 @@ data class NodeConfig(
                     ?.mapNotNull { (k, v) -> (k as? String)?.let { it.trim().lowercase() to (v as? String ?: it) } }
                     ?.toMap() ?: emptyMap(),
                 camera = str("camera").lowercase(),
+                roomOrder = (m["room_order"] as? List<*>)?.mapNotNull { (it as? String)?.trim()?.ifEmpty { null } } ?: emptyList(),
             )
         }
     }

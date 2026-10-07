@@ -49,6 +49,7 @@ class MainActivity : Activity() {
     private lateinit var root: FrameLayout
     private var webCrashes = 0
     private lateinit var splash: LinearLayout
+    private var home: HomeView? = null
     private var brightnessAnim: ValueAnimator? = null
     private var pageReady = false
     private lateinit var ambient: LinearLayout
@@ -119,6 +120,7 @@ class MainActivity : Activity() {
         web = WebView(this)
         setupWebView()
         root.addView(web, 0, FrameLayout.LayoutParams(-1, -1))
+        web.visibility = View.GONE
 
         ambient = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -353,11 +355,36 @@ class MainActivity : Activity() {
             return
         }
         setup.visibility = View.GONE
-        showSplash("connecting to ${origin(c.haUrl)?.removePrefix("http://")?.removePrefix("https://") ?: "Home Assistant"}…")
         idle.idleMs = c.idleSeconds * 1000L
+        // Native Glass home (default). HA Lovelace stays loaded underneath as the "HA" tab.
+        if (home == null) {
+            home = HomeView(this, c,
+                onOpenRoom = { /* room pad: next build */ },
+                onMic = { openAssist() },
+                onHome = { showHome() }).also { h ->
+                root.addView(h, FrameLayout.LayoutParams(-1, -1))
+                HaRepository.onChange { h.refresh() }
+            }
+        }
+        home?.refresh()
+        showHome()
+        hideSplash()
         val url = c.dashboardUrl + (if (c.dashboardUrl.contains('?')) "&" else "?") + "external_auth=1"
         web.loadUrl(url)
         applyMode()
+    }
+
+    private fun showHome() { home?.let { it.visibility = View.VISIBLE; it.bringToFront() }; web.visibility = View.GONE
+        ambient.bringToFront(); splash.bringToFront() }
+    private fun showHa() { web.visibility = View.VISIBLE; web.bringToFront(); home?.visibility = View.GONE
+        ambient.bringToFront(); splash.bringToFront() }
+    private fun openAssist() {
+        try {
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VOICE_COMMAND).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            try { startActivity(android.content.Intent("android.intent.action.ASSIST").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            catch (_: Exception) { android.util.Log.w(SynapseApp.TAG, "no assist app") }
+        }
     }
 
     private fun origin(url: String?): String? = try {
