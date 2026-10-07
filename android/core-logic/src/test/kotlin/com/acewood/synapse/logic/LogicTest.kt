@@ -802,3 +802,17 @@ class IntercomTest {
         assertNull(Intercom.resolve(cache)!!.messageInputId)
     }
 }
+
+class AmbientDataTest {
+    @Test fun snapshotIncludesWeatherTimerAndPlayingMedia() {
+        val cache = EntityCache().apply { applyStates(listOf(
+            Entity("weather.home", "sunny", mapOf("temperature" to 72.0)),
+            Entity("timer.dinner", "active", mapOf("friendly_name" to "Dinner", "remaining" to "00:15:00")),
+            Entity("media_player.tv", "playing", mapOf("media_title" to "News", "supported_features" to 16384.0)),
+        )) }
+        val s = AmbientData.snapshot(cache)
+        assertEquals("Sunny  72°", s.weather)
+        assertEquals("00:15:00", s.timer?.remaining)
+        assertEquals("News", s.nowPlaying?.title)
+    }
+}

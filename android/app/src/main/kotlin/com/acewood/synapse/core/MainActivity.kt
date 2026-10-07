@@ -70,14 +70,14 @@ class MainActivity : Activity() {
                 home?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile)
             }, 350)
         }
     }
     private var haHomeChip: TextView? = null
     private var brightnessAnim: ValueAnimator? = null
     private var pageReady = false
-    private lateinit var ambient: LinearLayout
-    private lateinit var ambientStatus: TextView
+    private lateinit var ambient: AmbientView
     private lateinit var setup: TextView
     private var cfg: NodeConfig? = null
     private val idle = IdleController(120_000)
@@ -148,31 +148,7 @@ class MainActivity : Activity() {
         root.addView(web, 0, FrameLayout.LayoutParams(-1, -1))
         web.visibility = View.GONE
 
-        ambient = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.BLACK)
-            visibility = View.GONE
-            alpha = 0f
-            addView(TextClock(context).apply {
-                format12Hour = "h:mm"; format24Hour = "H:mm"
-                textSize = 100f; setTextColor(Color.rgb(180, 185, 200))
-                typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-                letterSpacing = -0.02f; gravity = Gravity.CENTER
-            })
-            addView(TextClock(context).apply {
-                format12Hour = "EEEE, MMMM d"; format24Hour = "EEEE, d MMMM"
-                textSize = 22f; setTextColor(Color.rgb(110, 115, 130))
-                typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-                gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0)
-            })
-            ambientStatus = TextView(context).apply {
-                textSize = 15f; setTextColor(Color.rgb(90, 140, 110)); gravity = Gravity.CENTER
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                letterSpacing = 0.08f; setPadding(0, dp(28), 0, 0)
-            }
-            addView(ambientStatus)
-        }
+        ambient = AmbientView(this) { switchProfile() }.apply { visibility = View.GONE; alpha = 0f }
         root.addView(ambient, FrameLayout.LayoutParams(-1, -1))
 
         setup = TextView(this).apply {
@@ -307,7 +283,7 @@ class MainActivity : Activity() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
         NodeBus.screenMode = if (amb) "ambient" else "active"
         if (amb) {
-            ambientStatus.text = cfg?.let { "● ${it.room.uppercase()}" } ?: ""
+            ambient.refresh(HaRepository.cache, cfg, activeProfile)
             ambient.visibility = View.VISIBLE
             ambient.bringToFront()
             hideSystemBars()                                  // nav bar can reappear on relayout; re-hide it
