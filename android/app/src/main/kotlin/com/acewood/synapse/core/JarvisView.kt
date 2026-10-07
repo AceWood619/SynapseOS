@@ -19,6 +19,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.acewood.synapse.logic.AssistPipeline
 import com.acewood.synapse.logic.AssistVad
+import com.acewood.synapse.logic.LightingFx
 
 /**
  * Jarvis chat: type (or tap a quick prompt) and Home Assistant's Assist pipeline answers. It's the same
@@ -40,6 +41,7 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
     private var audioThread: Thread? = null
     private var micKey: TextView? = null
     private val speakKey = TextView(context)
+    private val quickRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
 
     private val prompts = listOf(
         "Turn off all the lights", "Is anyone home?", "What's the weather?", "Turn on the hallway light",
@@ -72,11 +74,7 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
         outer.addView(g.spacer(context, h = 8))
         outer.addView(HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
-            addView(LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(chip("Announce to a room") { onIntercom() })
-                prompts.forEach { p -> addView(chip(p) { send(p) }) }
-            })
+            addView(quickRow)
         })
         outer.addView(g.spacer(context, h = 8))
         outer.addView(g.row(context).apply {
@@ -98,6 +96,21 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
             addView(micKey)
         })
         bubble("Hi, I'm Jarvis. Tap a suggestion or type a command.", mine = false)
+        open()
+    }
+
+    /** Rebuild quick actions from the entities HA actually exposes; missing scripts never appear. */
+    fun open() {
+        quickRow.removeAllViews()
+        quickRow.addView(chip("Announce to a room") { onIntercom() })
+        LightingFx.available(HaRepository.cache).forEach { (id, fallback) ->
+            val label = HaRepository.cache?.get(id)?.friendlyName?.takeIf { it.isNotBlank() } ?: fallback
+            quickRow.addView(chip(label) {
+                bubble("Run $label", mine = true)
+                HaRepository.callService("script", "turn_on", listOf(id))
+            })
+        }
+        prompts.forEach { p -> quickRow.addView(chip(p) { send(p) }) }
     }
 
     private fun paintSpeak() {

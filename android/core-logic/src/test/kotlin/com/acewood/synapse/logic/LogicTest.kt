@@ -47,6 +47,18 @@ class AssistPipelineTest {
         assertEquals("Lights are on", AssistPipeline.speechFromIntent(data))
     }
 }
+class LightingFxTest {
+    @Test fun skipsMissingScriptsAndReadsHolidayOptions() {
+        val cache = EntityCache()
+        cache.applyStates(listOf(
+            Entity("script.ace_fx_ember", "off", mapOf("friendly_name" to "Ember Glow")),
+            Entity("input_select.holiday_mode", "halloween", mapOf("options" to listOf("none", "halloween"))),
+        ))
+        assertEquals(listOf("script.ace_fx_ember" to "Ember"), LightingFx.available(cache))
+        assertEquals("input_select.holiday_mode" to listOf("none", "halloween"), LightingFx.holiday(cache))
+        assertNull(LightingFx.holidayApplyId(cache))
+    }
+}
 class NodeConfigTest {
     private val good = """{"node_id":"Living Room 01","room":"Living Room","ha_url":"http://homeassistant.local:8123/",
         "ha_token":"abcdefghijklmnopqrstuvwxyz0123","api_key":"0123456789abcdef","pin":"2468"}"""

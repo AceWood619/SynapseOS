@@ -1,6 +1,7 @@
 package com.acewood.synapse.core
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -23,6 +24,7 @@ import com.acewood.synapse.logic.Profile
 import com.acewood.synapse.logic.Room
 import com.acewood.synapse.logic.RoomOrder
 import com.acewood.synapse.logic.MediaRemote
+import com.acewood.synapse.logic.LightingFx
 import java.util.Calendar
 
 /**
@@ -88,6 +90,8 @@ class HomeView(
     }
 
     private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private val fxWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private lateinit var fxHeader: View
     private val modesWrap = g.col(context)
     private val roomsRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private lateinit var roomsHeader: View
@@ -136,6 +140,10 @@ class HomeView(
         modesWrap.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(modesRow) })
         modesWrap.addView(g.spacer(context, h = 12))
         body.addView(modesWrap)
+        fxHeader = g.label(context, "LIGHT FX")
+        body.addView(fxHeader)
+        body.addView(fxWrap)
+        body.addView(g.spacer(context, h = 14))
         roomsHeader = g.label(context, "ROOM CHANNELS")
         body.addView(roomsHeader)
         body.addView(g.spacer(context, h = 8))
@@ -282,6 +290,7 @@ class HomeView(
             bindWeather(cache)
             bindJarvisChip(cache)
             buildModes(cache)
+            buildLightingFx(cache)
             buildRooms(cache)
             buildScenes(cache)
             buildHouse(cache)
@@ -301,6 +310,9 @@ class HomeView(
         cache.byDomain("timer").forEach { append(it.entityId).append(it.state).append(it.attributes["remaining"]).append(it.attributes["duration"]) }
         modes.forEach { append(cache.get(it.first)?.state) }
         JARVIS_SWITCHES.forEach { append(cache.get(it)?.state) }
+        LightingFx.fxCandidates.forEach { (id, _) -> append(cache.get(id)?.friendlyName).append(cache.get(id)?.state) }
+        LightingFx.holiday(cache)?.let { (id, options) -> append(cache.get(id)?.state).append(options) }
+        append(LightingFx.holidayApplyId(cache))
         housePills.forEach { append(cache.get(it.first)?.state) }
     }
 
@@ -419,6 +431,45 @@ class HomeView(
             if (cache.get(script) != null) { HaRepository.callService("script", "turn_on", listOf(script)); return }
         }
         HaRepository.toggle(listOf(id), !on)
+    }
+
+    private fun buildLightingFx(cache: EntityCache?) {
+        fxWrap.removeAllViews()
+        if (cache == null) { fxWrap.visibility = View.GONE; fxHeader.visibility = View.GONE; return }
+        val fx = LightingFx.available(cache)
+        val holiday = LightingFx.holiday(cache)
+        val apply = LightingFx.holidayApplyId(cache)
+        if (fx.isEmpty() && holiday == null) { fxWrap.visibility = View.GONE; fxHeader.visibility = View.GONE; return }
+        fxWrap.visibility = View.VISIBLE; fxHeader.visibility = View.VISIBLE
+        val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        fx.forEach { (id, fallback) ->
+            val entity = cache.get(id)
+            val label = prettyName(entity?.friendlyName?.takeIf { it.isNotBlank() } ?: fallback)
+            row.addView(fxKey(label, if (id.endsWith("stop")) Glass.RED else Glass.VIOLET) {
+                if (cache.get(id) != null) HaRepository.callService("script", "turn_on", listOf(id))
+            }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = g.dp(context, 8f) })
+        }
+        if (row.childCount > 0) fxWrap.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(row) })
+        if (holiday != null) {
+            val (selectId, options) = holiday
+            val selected = cache.get(selectId)?.state?.replace('_', ' ')?.replaceFirstChar { it.uppercase() } ?: "Holiday mode"
+            fxWrap.addView(g.row(context).apply {
+                addView(tv(12f, Glass.INK_DIM, g.body(context)).apply { text = "HOLIDAY  $selected" }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(fxKey("CHOOSE", Glass.AMBER) {
+                    if (options.isNotEmpty()) AlertDialog.Builder(context).setTitle("Holiday mode").setItems(options.toTypedArray()) { _, which ->
+                        val choice = options[which]
+                        HaRepository.callService("input_select", "select_option", listOf(selectId), mapOf("option" to choice))
+                        // Let the select land in HA before the apply script reads it (same race as intercom).
+                        if (apply != null && cache.get(apply) != null) postDelayed({ HaRepository.callService("script", "turn_on", listOf(apply)) }, 500)
+                    }.show()
+                })
+            })
+        }
+    }
+
+    private fun fxKey(label: String, color: Int, action: () -> Unit): View = tv(11f, color, g.disp(context)).apply {
+        text = label; gravity = Gravity.CENTER; letterSpacing = .04f; background = g.tile(context, color, false, 999f)
+        setPadding(g.dp(context, 13f), g.dp(context, 8f), g.dp(context, 13f), g.dp(context, 8f)); tap { action() }
     }
 
     private fun buildRooms(cache: EntityCache?) {

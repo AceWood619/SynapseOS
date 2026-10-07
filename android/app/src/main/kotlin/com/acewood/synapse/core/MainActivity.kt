@@ -73,6 +73,7 @@ class MainActivity : Activity() {
                 roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 diagnosticsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                jarvisView?.let { if (it.visibility == View.VISIBLE) it.open() }
                 if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile)
             }, 350)
         }
@@ -522,7 +523,7 @@ class MainActivity : Activity() {
         val run = {
             when (val t = app.target) {
                 is AppCatalog.Target.Internal -> when (t.id) {
-                    "jarvis" -> showOverlay(jarvisView)
+                    "jarvis" -> showOverlay(jarvisView) { it.open() }
                     "audio" -> showOverlay(audioView) { it.open() }
                     "sensors" -> showOverlay(sensorsView) { it.open() }
                     "diagnostics" -> showOverlay(diagnosticsView) { it.open() }
@@ -557,7 +558,7 @@ class MainActivity : Activity() {
         haHomeChip?.let { it.visibility = View.VISIBLE; it.bringToFront() }
         ambient.bringToFront(); splash.bringToFront() }
     private fun openAssist() {
-        showOverlay(jarvisView)
+        showOverlay(jarvisView) { it.open() }
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 7001)
         } else jarvisView?.beginVoice()
