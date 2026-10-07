@@ -388,6 +388,7 @@ class MainActivity : Activity() {
                 onSensors = { showOverlay(sensorsView) { it.open() } },
                 onLaunch = { app -> launchApp(app) },
                 onSwitchProfile = { switchProfile() },
+                onJarvisSwitch = { live -> jarvisKillSwitch(live) },
                 onIntercom = { showOverlay(intercomView) { it.open() } }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
@@ -454,6 +455,21 @@ class MainActivity : Activity() {
         haPathLoaded = null
         web.loadUrl(url)
         applyMode()
+    }
+
+    /**
+     * Jarvis kill switch (Mason). Killing is one tap for anyone: wake words off everywhere (HA's own
+     * jarvis_killswitch package then mutes every mic) and Jarvis loses dining-PC control/power. Turning Jarvis back on
+     * needs the admin PIN and only restores voice + PC control (power commands stay off).
+     */
+    private fun jarvisKillSwitch(live: Boolean) {
+        if (live) {
+            HaRepository.callService("input_boolean", "turn_off", HomeView.JARVIS_SWITCHES)
+            Toast.makeText(this, "Jarvis is OFF: wake words muted everywhere, no PC control", Toast.LENGTH_LONG).show()
+        } else askPin {
+            HaRepository.callService("input_boolean", "turn_on", listOf("input_boolean.jarvis_voice", "input_boolean.dining_pc_jarvis_control"))
+            Toast.makeText(this, "Jarvis is back on (per-room voice switches still apply)", Toast.LENGTH_LONG).show()
+        }
     }
 
     /** Tap the profile badge: forget the current profile and show the picker. */

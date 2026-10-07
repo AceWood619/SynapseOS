@@ -41,6 +41,8 @@ class HomeView(
     private val onHome: () -> Unit,
     private val onRooms: () -> Unit = {},
     private val onAudio: () -> Unit = {},
+    /** Jarvis kill switch tapped: true = Jarvis is currently live (so kill it), false = it's off (ask to restore). */
+    private val onJarvisSwitch: (Boolean) -> Unit = {},
     private val onHa: () -> Unit = {},
     private val onApps: () -> Unit = {},
     private val onSensors: () -> Unit = {},
@@ -78,6 +80,13 @@ class HomeView(
     private val nowPlayingCard = g.col(context).apply { visibility = View.GONE }
     private val timerCard = TimerCardView(context)
     private val weatherChip = tv(12f, Glass.AMBER, g.disp(context)).apply { visibility = View.GONE }
+    private val jarvisChip = tv(11f, Glass.MINT, g.disp(context)).apply {
+        letterSpacing = 0.1f; gravity = Gravity.CENTER
+        setPadding(g.dp(context, 10f), g.dp(context, 5f), g.dp(context, 10f), g.dp(context, 5f))
+        layoutParams = LinearLayout.LayoutParams(-2, -2).apply { leftMargin = g.dp(context, 10f) }
+        tap { onJarvisSwitch(jarvisLive(HaRepository.cache)) }
+    }
+
     private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val modesWrap = g.col(context)
     private val roomsRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
@@ -174,8 +183,22 @@ class HomeView(
         addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
         addView(weatherChip.apply { setPadding(0, 0, g.dp(context, 10f), 0) })
         addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
+        addView(jarvisChip)
         addView(haChip())
         addView(profilePill())
+    }
+
+    /** Jarvis kill switch: the HA helpers that let Jarvis listen and act. */
+    companion object {
+        val JARVIS_SWITCHES = listOf("input_boolean.jarvis_voice", "input_boolean.dining_pc_jarvis_control", "input_boolean.dining_pc_jarvis_power")
+        fun jarvisLive(cache: EntityCache?): Boolean = JARVIS_SWITCHES.any { cache?.get(it)?.state == "on" }
+    }
+
+    private fun bindJarvisChip(cache: EntityCache?) {
+        val live = jarvisLive(cache)
+        jarvisChip.text = if (live) "JARVIS ●" else "JARVIS OFF"
+        jarvisChip.setTextColor(if (live) Glass.MINT else Glass.RED)
+        jarvisChip.background = g.tile(context, if (live) Glass.MINT else Glass.RED, !live, 999f)
     }
 
     private fun haChip(): View = tv(11f, Glass.BLUE, g.disp(context)).apply {
@@ -257,6 +280,7 @@ class HomeView(
             bindNowPlaying(cache)
             timerCard.refresh(cache)
             bindWeather(cache)
+            bindJarvisChip(cache)
             buildModes(cache)
             buildRooms(cache)
             buildScenes(cache)
@@ -276,6 +300,7 @@ class HomeView(
         cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
         cache.byDomain("timer").forEach { append(it.entityId).append(it.state).append(it.attributes["remaining"]).append(it.attributes["duration"]) }
         modes.forEach { append(cache.get(it.first)?.state) }
+        JARVIS_SWITCHES.forEach { append(cache.get(it)?.state) }
         housePills.forEach { append(cache.get(it.first)?.state) }
     }
 
