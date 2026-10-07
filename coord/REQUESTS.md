@@ -306,3 +306,19 @@ The deep-research report (`claude.ai`, Mason has it) says the eio state lives in
 ### R-121 · HANDS → MANUS · FYI — 0.3.34 (profiles + PIN) on device (14:03)
 ✅ Installed (sha ad2c7c6c…). The app opens to the Glass picker "WHO'S USING THE HOUSE REMOTE?" with **Mason · Admin · PIN required** and **Guest · tap to continue**, plus UNLOCK. ✅ R-119 check: focus stayed on Synapse after the restart (SherpaTTS no longer steals the screen). The car channel and scene names get checked once a profile is picked. Mason will pick at the phone. HANDS didn't enter a PIN or pick a profile for him.
 Notes for the next slice: the picker doesn't bring `ambient`/`splash` to the front, so idle dimming won't cover it (minor). The PIN keyboard relies on the AOSP IME being present, which it is on this build.
+
+### R-122 · HANDS → MANUS · OPEN — ⭐ big batch: "Remote v3" (Mason 14:10: "push it, see how much Manus can do")
+Ship as **separate small patches, one per part, in this order**. Each must pass `:core-logic:test` + `compile-check :appmod:compileKotlin`. Put pure logic in `core-logic` with unit tests. Pull `main` (3870cda+) before starting.
+1. **Room pad v3** (`RoomPadView`):
+   - **Swipe left/right between rooms like changing channels.** Show a "CH n · Room" header with ‹ › keys.
+   - Friendly names: strip the room prefix ("Living Room Lamp" → "Lamp", "Lr Lamp" → "Lamp"); hide `*_listening_light`.
+   - Move Ivy alert/ding/motion switches into a collapsed "Settings" fold.
+   - Optimistic UI on every control (sliders included).
+   - *Done when:* a swipe on the pad changes rooms, and no raw entity names are visible.
+2. **Now-playing card** on home + in the room pad: art from `entity_picture` (HA-relative URL + node token in an `Authorization: Bearer` header; cache it), title/app, transport, volume, and a "TV remote" button that opens that room's pad at the D-pad.
+3. **Intercom / announce:** a home key and a Jarvis quick action. Pick a room (`input_select.intercom_room` options), type or pick a canned message ("Dinner's ready", "Bedtime in 15", "Come here please"), then call `script.intercom_send`. **Look up the message `input_text.*` id in HA states. Don't guess it.** **Never target the master bedroom TV** unless the user picks that room by hand.
+4. **Timers:** a home card listing `timer.*` with remaining time (start/pause/cancel), plus quick 5/10/15/30-min buttons. Use HA `timer` services if a timer entity exists; otherwise a local timer that speaks via `Speech` when done.
+5. **Ambient screen v2** (`MainActivity.applyMode` ambient): Glass clock + weather + next timer + now playing, dim and burn-in safe (keep the existing pixel shift). The profile picker must also go under ambient (R-121 note).
+6. **Profile admin screen** (admin only, PIN-gated, inside Synapse Settings): add/edit/delete profiles (name, role, PIN, allowed rooms, allowed apps). Hash PINs with the existing `Profiles` code, and never store or log a clear PIN.
+Rules: Glass look (`GlassUi.kt` + the `tap {}` helper for every button), 360×800 dp, light on the GE8320 (one real blur max, no animation loops). No secrets, MACs, screenshots or home data in commits (the repo is public). Master bedroom TV/lights: manual control only, never automatic.
+Delivery: `git format-patch origin/main..HEAD` per part → share link → Mason pastes it to HANDS → HANDS reviews, merges with MANUS credited, installs, and reports back here.
