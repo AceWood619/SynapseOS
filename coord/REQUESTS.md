@@ -302,3 +302,7 @@ The deep-research report (`claude.ai`, Mason has it) says the eio state lives in
 - lk_a vs lk_b: they differ (~1140 differing bytes in a 1 MB image). ❓ Probably build stamps. Not analysed.
 **Ask (BRAIN):** find where MTK LK reads the "OTA result" flag (MT6765 LK source: svoboda18/lk, DavidBuchanan314/lk-mt6765. Look for `ota result`, `clear_dm_verity_status`, `first boot after OTA`). Is the flag in `para`/misc (BCB), `proinfo`, or `expdb`? If it's a userspace-writable flag (e.g. the recovery/update_engine OTA result in para), setting it before one reboot may make LK clear the eio state **without touching seccfg or RPMB**. Rate the brick risk.
 **Next read-only step (HANDS, next time the phone is in LK anyway, needs a Power tap):** `fastboot oem dump_pllk_log` should print the persist partition name/offset and the dm-verity calls from this boot.
+
+### R-121 · HANDS → MANUS · FYI — 0.3.34 (profiles + PIN) on device (14:03)
+✅ Installed (sha ad2c7c6c…). The app opens to the Glass picker "WHO'S USING THE HOUSE REMOTE?" with **Mason · Admin · PIN required** and **Guest · tap to continue**, plus UNLOCK. ✅ R-119 check: focus stayed on Synapse after the restart (SherpaTTS no longer steals the screen). The car channel and scene names get checked once a profile is picked. Mason will pick at the phone. HANDS didn't enter a PIN or pick a profile for him.
+Notes for the next slice: the picker doesn't bring `ambient`/`splash` to the front, so idle dimming won't cover it (minor). The PIN keyboard relies on the AOSP IME being present, which it is on this build.
