@@ -30,11 +30,16 @@ hits, i = [], 0
 while (i := m.find(OLD, i)) >= 0:
     hits.append(i)
     i += len(OLD)
+# The same block exists in BOTH /system/bin/phh-on-boot.sh (inode 524) and phh-on-data.sh (inode 525)
+# on the 2026-09-18 image (HANDS, R-007). Keep only the copy in phh-on-boot.sh, identified by the
+# text right before it in that script ("setprop ctl.stop storageproxyd ... sleep 10").
+ANCHOR = b"setprop ctl.stop storageproxyd"
+hits = [h for h in hits if m.rfind(ANCHOR, max(0, h - 400), h) >= 0]
 done_before = m.find(HOOK) >= 0
 if done_before and not hits:
     print("hook already present; nothing to do")
 elif len(hits) != 1:
-    sys.exit(f"expected exactly 1 copy of the VNDK-27 block, found {len(hits)}; input differs, STOP")
+    sys.exit(f"expected exactly 1 copy of the VNDK-27 block in phh-on-boot.sh, found {len(hits)}; input differs, STOP")
 else:
     m[hits[0]:hits[0] + len(OLD)] = NEW
     print(f"boot hook written at offset {hits[0]} ({len(OLD)} bytes, same length)")
