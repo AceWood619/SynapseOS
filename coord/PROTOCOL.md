@@ -10,8 +10,8 @@ Two Claude sessions work on SynapseOS at the same time. Each does what it's best
 Rule of thumb: if it needs the phone, PC or LAN, it's HANDS. If it needs reading, thinking or writing code, it's BRAIN.
 
 ## Shared branch
-- Everything coordination-related lives on the branch **`claude/coordination`**.
-- Device notes and the research report are also on this branch, as copies.
+- Everything lives on **`main`** (merged 2026-10-07 with Mason's OK). The old `claude/*` branches are frozen; don't commit to them.
+
 - **Always `git pull` before reading, and commit + push right after writing.** Keep commits small. If a push is rejected, pull (merge, never force-push) and retry.
 
 ## Files
