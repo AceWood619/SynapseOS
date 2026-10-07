@@ -37,7 +37,8 @@ jobs:
       - name: Show compiler errors
         if: failure()
         working-directory: android
-        run: grep -E "^e: |error:|FAILED|What went wrong" -A3 build.log | head -80 || true
+        run: |
+          grep -E "^e: |error:|FAILED|What went wrong" -A3 build.log | head -80 || true
 
       - name: Upload test reports
         if: always()
