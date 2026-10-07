@@ -60,6 +60,19 @@ class Adb:
     def sh(self, cmd, timeout=60):
         return self.run("shell", cmd, timeout=timeout)[1]
 
+    def wait_for_device(self, timeout=30):
+        """After an adbd restart (e.g. unroot over Wi-Fi) the TCP session drops; reconnect and
+        wait until the device is actually back, so later commands don't silently get 'offline'."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self.serial and ":" in self.serial:
+                subprocess.run([self.adb, "connect", self.serial], capture_output=True, text=True, timeout=15)
+            rc, out = self.run("get-state", timeout=10)
+            if out.strip() == "device":
+                return True
+            time.sleep(1.5)
+        return False
+
 
 def sha256(path):
     h = hashlib.sha256()
@@ -130,10 +143,13 @@ def main():
         subprocess.run([a.adb, "connect", a.serial], capture_output=True, text=True, timeout=20)
     if adb.sh("id -u").strip() == "0":
         adb.run("unroot", timeout=20)
-        time.sleep(2)
-        if a.serial and ":" in a.serial:
-            subprocess.run([a.adb, "connect", a.serial], capture_output=True, text=True, timeout=20)
-        step("adb dropped to shell user (so config.json is app-readable)", adb.sh("id -u").strip() != "0", "uid " + adb.sh("id -u").strip())
+        time.sleep(1)
+        back = adb.wait_for_device(30)          # unroot drops the Wi-Fi session; wait for it to return
+        uid = adb.sh("id -u").strip()
+        if not step("adb dropped to shell user (config.json becomes app-readable)",
+                    back and uid == "2000", f"uid={uid or 'offline'}"):
+            print("  (unroot/reconnect failed — aborting before pushing the token)")
+            return finish()
     model = adb.sh("getprop ro.product.vendor.model")
     if not step("phone reachable over adb", bool(model) and "error" not in model.lower(), model):
         return finish()

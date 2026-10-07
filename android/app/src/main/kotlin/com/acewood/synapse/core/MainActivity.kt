@@ -254,6 +254,7 @@ class MainActivity : Activity() {
             tickCount++
             if (idle.tick(now())) applyMode()
             // Burn-in protection: nudge the clock a little every minute.
+            if (ambient.visibility == View.VISIBLE && tickCount % 5 == 0L) hideSystemBars()
             if (tickCount % 60 == 0L && ambient.visibility == View.VISIBLE) {
                 ambient.animate().translationX(Random.nextInt(-dp(30), dp(30)).toFloat())
                     .translationY(Random.nextInt(-dp(40), dp(40)).toFloat())
@@ -272,6 +273,8 @@ class MainActivity : Activity() {
         if (amb) {
             ambientStatus.text = cfg?.let { "● ${it.room.uppercase()}" } ?: ""
             ambient.visibility = View.VISIBLE
+            ambient.bringToFront()
+            hideSystemBars()                                  // nav bar can reappear on relayout; re-hide it
             ambient.animate().alpha(1f).setDuration(500).setInterpolator(DecelerateInterpolator()).start()
             rampBrightness(cfg?.ambientBrightness ?: 0.02f, clearAfter = false, durationMs = 700)
         } else {
