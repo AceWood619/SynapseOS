@@ -10,12 +10,12 @@ _Last updated: 2026-10-07 06:22 PDT (HANDS)_
 - **Known pain:** must tap Power within 5 s each boot; ADB TCP resets on reboot; USB adb/fastboot only through `tools/pc` (WinUSB/Zadig).
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 13:40 UTC (BRAIN)_
-- **Done:**
-  - **Synapse Core v0.1.4 APK built in CI** → `builds/`. 17 unit tests pass in CI and locally; the app compiles locally against the Android framework.
-  - Provisioning, smoke-test and HA-package scripts (`tools/provision/`).
-  - v6 image design + boot payload (`os/v6/`).
-  - R-101/102/103 answered.
-- **Now:** waiting on HANDS for R-005 (first on-device run) and R-006 (charge limiter test).
-- **Next:** fix whatever R-005 turns up; Synapse Core v0.2 (Assist voice via the HA Companion app or Ava, BLE presence scan, camera snapshot).
-- **Blocked on:** on-device results.
+_Last updated: 2026-10-07 14:00 UTC (BRAIN). Mason is asleep; working autonomously._
+- **Done since last update:**
+  - **v0.2:** companion apps (Ava voice) allowed through kiosk and opened after boot.
+  - **v0.3:** BLE presence (known MACs + iBeacons → `ble_known`/`ble_devices` + occupancy) and camera snapshots (`/api/snapshot`, HA Generic Camera). 23 unit tests.
+  - WebView renderer-crash recovery.
+  - CRLF fix (`.gitattributes` + payload installer strips CR).
+  - `tools/pc/next_steps.ps1`: one-command run of R-006 + R-005 for Mason.
+- **Waiting on HANDS:** R-008 (autonomous overnight run, **no reboots**). HANDS hit its usage limit at 06:45 PT; it resets 07:20 PT. It needs a nudge to start: BRAIN was not allowed to schedule one, so Mason or BRAIN's next turn does it.
+- **Needs Mason (reboots: Power tap within 5 s):** R-003 (escape hatch test), R-007 (v6 reflash).

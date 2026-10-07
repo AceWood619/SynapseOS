@@ -1,6 +1,11 @@
 # Findings: quick facts each chat must know
 Newest first. One or two lines each, with a link to the detail.
 
+- ⚠️ **Overnight rule: no reboots while Mason sleeps.** Every boot shows the dm-verity screen and needs a Power tap within 5 s, or the phone powers off. (BRAIN)
+- ✅ **Charge limiter runs on the phone:** the cgroup escape moved the PID, and hold wrote `0 1` at 100 %. Drain vs flat is still being measured (R-006). (HANDS, 06:37 PT)
+- ⚠️ **Windows checkout = CRLF, which breaks phone shell scripts.** Fixed with `.gitattributes` (LF). Re-check-out `*.sh` on the PC. (HANDS found, BRAIN fixed)
+- ⚠️ **Android hides iBeacons from `neverForLocation` BLE scans.** Synapse asks for location instead, and provision turns on location services. (BRAIN)
+
 - ✅ **Synapse Core APK is built by GitHub Actions** (the cloud can't reach dl.google.com) and committed to `builds/`. `git pull` = newest APK. (BRAIN)
 - ✅ **TrebleDroid `phh-on-boot.sh` runs as root (permissive `phhsu_daemon`) after every boot.** Its VNDK-27 block is dead code here, so v6 swaps it for a hook into `/data/adb/synapse/boot.sh`. (BRAIN → `os/v6`)
 - ⚠️ **init kills a oneshot service's whole process group when it exits** (vendor API ≥ R). Long-running jobs started from the hook must leave the cgroup; `boot.sh` does this. (BRAIN)
