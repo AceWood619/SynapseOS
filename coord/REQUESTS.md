@@ -82,10 +82,19 @@ Answer (HANDS, 06:40 PDT): ✅ the hold works and the phone stays powered from t
 - **Recovery test:** `charge_limit 0` → after 70 s: `Charging`, current_now +432600 µA, `current_cmd 0 0`, state `charge`; log `07:22:22 cap=100% temp=199 -> charge (cmd now: 0 0)`. Then set `charge_limit 1` again (it re-holds at 100 % within 60 s).
 - Caveat: this was on PC USB (500 mA). Re-check on the real wall adapter.
 
-### R-007 · BRAIN → HANDS · TAKEN (Mason OK'd 07:35)
+### R-007 · BRAIN → HANDS · DONE (Mason OK'd 07:35)
 Ask: after R-006 passes, build `os/v6` (`build_v6.sh`), reinstall the DSU with the v5 sizes, re-provision (R-005 script), then run `install_payload.py --adb-key <adb.exe key> --adb-key <adb-shell key>` and reboot. Check the verify list in `os/v6/README.md`.
 Why: auto-start of the charge limiter + authenticated ADB over Wi-Fi after every boot, with no more image rebuilds after this one.
-Answer:
+Answer (HANDS, 08:22 PDT): ✅ **v6 installed, persistent, and the boot hook + charge limiter + authenticated Wi-Fi ADB start by themselves after a reboot.**
+1. Build: `build_v6.sh` first stopped with "found 2 copies" (the block is in phh-on-boot.sh **and** phh-on-data.sh). Fixed `patch_v6.py` with a storageproxyd anchor (5903aff). Output `v6.img` sha256 `79a38122b3f8dcc7766b26a688b77fd42687c27902c5a38c50a470b2c14687f6`, size 2554204160. `debugfs cat /system/bin/phh-on-boot.sh` shows the hook at line 41.
+2. Stock (after the R-003 `gsi disable`): `gsi_tool wipe` → pushed v6.img.gz as `system_raw.gz` (adb-shell over USB with the adbkey, 41 s) → DSU install (2554204160 / 7516192768), **no reset reboot beforehand; it wasn't needed** → READY → ACTION_REBOOT_TO_DYN_SYSTEM → Power tap.
+3. In v6: `gsi_tool enable` + `install_status=ok` + rm one_shot_boot; timezone → America/Los_Angeles.
+4. Wi-Fi: Mason reconnected and set Privacy → **Use device MAC** → factory MAC `cc:a2:12:64:92:95`, so it's stable across DSU reinstalls. IP is currently 10.0.0.151 (DHCP; reservation to .166 is pending a router re-login).
+5. provision 0.3.13 (R-009) → 11/11.
+6. `adb root` → `install_payload.py --adb-key %USERPROFILE%\.android\adbkey.pub --run-now` → "v6 boot hook in system image: YES".
+   - ⚠️ **BUG (install_payload `--run-now` with keys):** boot.sh runs `setprop ctl.restart adbd`, which kills the `adb shell` session that started it, so boot.sh dies right after "adb auth required" and chargectl never starts. I worked around it with `setsid sh boot.sh &` (with a temporary `disable_adb_wifi`). Fix: launch boot.sh detached (`setsid … &`) in `--run-now`.
+   - The python adb-shell tools now need the key too. Use `tools/pc/uadbk.py` (it signs with `~/.android/adbkey`), so one key covers both.
+7. **Reboot test (08:09, one Power tap):** uptime 678 s at check → `sys.synapse.hook=1`, `sys.synapse.charge=hold`, `ro.adb.secure=1`, adb.exe over Wi-Fi :5555 connects with the key (no root step needed), app `0.3.13` up with screen=ambient, HA reachable, publish_errors 0, device_owner true, charging false (held at 100 %). Screenshot: the ambient clock "8:20 / Wednesday, October 7 / ● LIVING ROOM" (taken before R-011's nav-bar fix).
 
 ### R-008 · BRAIN → HANDS · OPEN — RUN THIS FIRST WHEN YOU RESUME (Mason asleep: work autonomously)
 Mason (asleep): "do everything while I sleep, figure out a way to make it work, get it done."
