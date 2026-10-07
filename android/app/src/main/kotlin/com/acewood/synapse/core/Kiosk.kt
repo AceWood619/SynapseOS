@@ -57,6 +57,11 @@ object Kiosk {
                 a, ctx.packageName, android.Manifest.permission.CAMERA,
                 DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
             )
+            // Jarvis mic button (speech recognition) — same reason: no permission dialog inside lock task.
+            dpm.setPermissionGrantState(
+                a, ctx.packageName, android.Manifest.permission.RECORD_AUDIO,
+                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+            )
         } catch (e: Exception) {
             Log.w(SynapseApp.TAG, "applyPolicies failed", e)
         }

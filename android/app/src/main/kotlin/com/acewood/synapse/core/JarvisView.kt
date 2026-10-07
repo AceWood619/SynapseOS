@@ -2,6 +2,10 @@ package com.acewood.synapse.core
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
@@ -30,6 +34,7 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
     private var conversationId: String? = null
     private var speakReplies = true
     private var speech: Speech? = null
+    private var recognizer: SpeechRecognizer? = null
     private val speakKey = TextView(context)
 
     private val prompts = listOf(
@@ -85,7 +90,7 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
             addView(g.spacer(context, w = 8))
             addView(key("SEND", Glass.BLUE) { sendInput() })
             addView(g.spacer(context, w = 8))
-            addView(key("🎤", Glass.VIOLET) { hideKeyboard(); onVoice() })
+            addView(key("MIC", Glass.VIOLET) { hideKeyboard(); onVoice() })
         })
         bubble("Hi, I'm Jarvis. Tap a suggestion or type a command.", mine = false)
     }
@@ -115,6 +120,36 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
                     try { s.speak(reply) } catch (_: Exception) {}
                 }
             }
+        }
+    }
+
+    /** Starts Android speech recognition, then routes the transcript through HA conversation/process. */
+    fun beginVoice() {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            bubble("No speech recognizer is installed.", mine = false); return
+        }
+        recognizer?.destroy()
+        recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { r ->
+            r.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: android.os.Bundle?) { input.hint = "Listening…" }
+                override fun onBeginningOfSpeech() { input.hint = "Listening…" }
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() { input.hint = "Processing…" }
+                override fun onError(error: Int) { input.hint = "Message Jarvis…"; bubble("I couldn't hear that (voice error $error).", mine = false) }
+                override fun onResults(results: android.os.Bundle?) {
+                    input.hint = "Message Jarvis…"
+                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                    if (text.isNotBlank()) send(text) else bubble("I didn't catch a command.", mine = false)
+                }
+                override fun onPartialResults(partialResults: android.os.Bundle?) {}
+                override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+            })
+            r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            })
         }
     }
 
@@ -153,5 +188,5 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
         try { (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0) } catch (_: Exception) {}
     }
 
-    fun close() { hideKeyboard(); try { speech?.shutdown() } catch (_: Exception) {}; speech = null }
+    fun close() { hideKeyboard(); recognizer?.destroy(); recognizer = null; try { speech?.shutdown() } catch (_: Exception) {}; speech = null }
 }

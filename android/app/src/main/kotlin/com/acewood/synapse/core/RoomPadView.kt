@@ -125,7 +125,7 @@ class RoomPadView(
         (r.lights + r.switches + r.media + r.extras + r.remotes + r.fans + r.covers + r.climate + r.locks + r.sensors).forEach { id ->
             val e = cache.get(id); append('|').append(id).append('=').append(e?.state)
             if (e != null) {
-                append(e.attributes["brightness"]); append(e.attributes["volume_level"]); append(e.attributes["media_title"])
+                append(e.attributes["brightness"]); append(e.attributes["volume_level"]); append(e.attributes["is_volume_muted"]); append(e.attributes["media_title"])
                 append(e.attributes["percentage"]); append(e.attributes["current_position"]); append(e.attributes["temperature"])
             }
         }
@@ -263,6 +263,24 @@ class RoomPadView(
                     HaRepository.optimisticAttribute(listOf(t.entityId), "volume_level", pct / 100.0)
                     HaRepository.callService("media_player", "volume_set", listOf(t.entityId), mapOf("volume_level" to pct / 100.0))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            })
+        }
+        if (t.canVolumeStep || t.canMute) {
+            addView(g.spacer(context, h = 8))
+            addView(g.row(context).apply {
+                gravity = Gravity.CENTER
+                if (t.canVolumeStep) {
+                    addView(roundKey("VOL −") { send(MediaRemote.volumeDown(t.entityId)) })
+                    addView(g.spacer(context, w = 7))
+                }
+                if (t.canMute) {
+                    addView(roundKey(if (t.isMuted) "UNMUTE" else "MUTE", if (t.isMuted) Glass.RED else Glass.INK_DIM) {
+                        HaRepository.optimisticAttribute(listOf(t.entityId), "is_volume_muted", !t.isMuted)
+                        send(MediaRemote.mute(t.entityId, !t.isMuted))
+                    })
+                    if (t.canVolumeStep) addView(g.spacer(context, w = 7))
+                }
+                if (t.canVolumeStep) addView(roundKey("VOL +", Glass.MINT) { send(MediaRemote.volumeUp(t.entityId)) })
             })
         }
         if (t.showDpad) {

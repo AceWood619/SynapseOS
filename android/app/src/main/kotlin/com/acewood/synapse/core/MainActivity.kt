@@ -56,6 +56,7 @@ class MainActivity : Activity() {
     private var sensorsView: SensorsView? = null
     private var jarvisView: JarvisView? = null
     private var intercomView: IntercomView? = null
+    private var audioView: AudioView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -240,7 +241,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Back is handled inside the dashboard")
     override fun onBackPressed() {
-        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, drawerView).any { it?.visibility == View.VISIBLE }
+        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, audioView, drawerView).any { it?.visibility == View.VISIBLE }
         when {
             overlayOpen -> showHome()
             web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
@@ -410,6 +411,11 @@ class MainActivity : Activity() {
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
+        if (audioView == null) {
+            audioView = AudioView(this, onBack = { showHome() }, onMusic = { showHa("/media-browser/browser") }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
         if (drawerView == null) {
             drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) },
                 activeProfile = { activeProfile }).also { v ->
@@ -472,7 +478,7 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }
@@ -492,6 +498,7 @@ class MainActivity : Activity() {
             when (val t = app.target) {
                 is AppCatalog.Target.Internal -> when (t.id) {
                     "jarvis" -> showOverlay(jarvisView)
+                    "audio" -> showOverlay(audioView) { it.open() }
                     "sensors" -> showOverlay(sensorsView) { it.open() }
                     "ha" -> showHa()
                     "music" -> showHa("/media-browser/browser")
@@ -524,12 +531,14 @@ class MainActivity : Activity() {
         haHomeChip?.let { it.visibility = View.VISIBLE; it.bringToFront() }
         ambient.bringToFront(); splash.bringToFront() }
     private fun openAssist() {
-        try {
-            startActivity(android.content.Intent(android.content.Intent.ACTION_VOICE_COMMAND).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        } catch (e: Exception) {
-            try { startActivity(android.content.Intent("android.intent.action.ASSIST").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            catch (_: Exception) { android.util.Log.w(SynapseApp.TAG, "no assist app; opening Jarvis chat"); showOverlay(jarvisView) }
-        }
+        showOverlay(jarvisView)
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 7001)
+        } else jarvisView?.beginVoice()
+    }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 7001 && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) jarvisView?.beginVoice()
     }
 
     private fun origin(url: String?): String? = try {

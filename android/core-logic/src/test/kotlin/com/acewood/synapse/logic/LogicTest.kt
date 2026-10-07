@@ -538,6 +538,12 @@ class RoomControlTest {
         assertEquals("The Mandalorian", mt.title)
         assertEquals(40, mt.volumePct)
     }
+    @Test fun mediaExposesVolumeStepAndMuteCapabilities() {
+        val room = Rooms.build(listOf(Area("den", "Den", listOf("media_player.den_tv")))).first()
+        val c = cache(Entity("media_player.den_tv", "paused", mapOf("supported_features" to (1024 + 8).toDouble(), "is_volume_muted" to false)))
+        val mt = RoomControl.build(room, c).media.single()
+        assertTrue(mt.canVolumeStep); assertTrue(mt.canMute); assertFalse(mt.isMuted)
+    }
     @Test fun plainMediaNoDpadNoRemote() {
         val room = Rooms.build(listOf(Area("office", "Office", listOf("media_player.sonos")))).first()
         val c = cache(Entity("media_player.sonos", "paused", mapOf("supported_features" to 1.0 /* PAUSE only */)))

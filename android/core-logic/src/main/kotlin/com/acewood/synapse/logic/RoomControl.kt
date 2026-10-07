@@ -29,6 +29,8 @@ object RoomControl {
         val showDpad: Boolean,        // Roku-style: show the directional pad
         val albumArt: String? = null,
         val appName: String? = null,
+        val canVolumeStep: Boolean = false,
+        val canMute: Boolean = false,
     )
 
     data class ToggleTile(val entityId: String, val name: String, val isOn: Boolean, val available: Boolean)
@@ -177,6 +179,8 @@ object RoomControl {
             showDpad = roku || room.remotes.isNotEmpty(),
             albumArt = e?.attributes?.get("entity_picture") as? String,
             appName = e?.attributes?.get("app_name") as? String,
+            canVolumeStep = has(feat, FEAT_VOLUME_STEP),
+            canMute = has(feat, FEAT_VOLUME_MUTE),
         )
     }
 

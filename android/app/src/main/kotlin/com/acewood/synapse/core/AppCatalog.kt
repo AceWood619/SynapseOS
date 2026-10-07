@@ -37,6 +37,7 @@ object AppCatalog {
 
     val INTERNAL_APPS = listOf(
         App("Jarvis", "✦", Target.Internal("jarvis")),
+        App("Audio", "♫", Target.Internal("audio")),
         App("Sensors", "≋", Target.Internal("sensors")),
         App("Home Assistant", "⌂", Target.Internal("ha")),
         App("Music", "♫", Target.Internal("music")),
