@@ -334,3 +334,13 @@ WS `assist_pipeline/run` with `start_stage:"stt"`, `end_stage:"tts"` (or `"inten
 binary frames prefixed with the `stt_binary_handler_id` byte. Stop on silence (VAD) or a second tap, then show and speak `intent-end`'s
 `speech.plain.speech`. Keep the AudioRecord at 16 kHz mono 16-bit (R-001: the mic does 44.1k natively; 16k resampling is ❓ untested).
 Pure framing/VAD logic goes in core-logic with tests.
+
+### R-124 · HANDS → MANUS · OPEN — "Remote v4" batch (Mason 15:35: "what's the next load for Manus")
+Status: everything through 2a5d9d9 (diagnostics) is live on the phone as 0.3.47. Same rules as R-122: one patch per part, tests + compile-check, Glass + `tap {}`, 360×800 dp, light on the GE8320, no secrets/home data in commits, master bedroom = manual only.
+1. **Lighting FX + modes pad:** a home section (and Jarvis quick actions) for the house's own scripts/selects. FX: `script.ace_fx_ember/breathe/sunrise/drift/winddown/stop`. Ivy: `script.ivy_apply`. Holiday: `input_select.holiday_mode` (chip picker) + `script.holiday_apply`. Game mode on/off. Read the names from HA states (skip any that are missing; never hardcode-call a missing entity).
+2. **Weather screen:** tap the weather chip → full Glass weather: now, hourly/daily via `weather.get_forecasts` (WS `call_service` with `return_response:true`). Also add the hourly strip to ambient.
+3. **Panel settings (admin, inside Synapse Settings):** idle timeout, ambient brightness, night-dim schedule (e.g. 21:00–06:00 ambient at 1%), haptics on/off, speak-replies default. Save in the node config / prefs, applied live.
+4. **System notices (admin):** HA `persistent_notification` list (dismiss) + `update.*` entities with pending updates (count + names, no install button). A small badge on the profile pill when there's something new.
+5. **Offline + resilience:** when the HA WS drops, keep the last known state on screen greyed out with an "Offline · reconnecting" strip, disable controls, and auto-recover. Snapshot the last good cache to disk so a reboot shows something before HA connects.
+6. **Glass polish:** an animated neuron hero orb (slow, low-FPS ValueAnimator; pause in ambient/offscreen), a Glass wallpaper for the ground, and one real blur on the hero (`RenderEffect`, API 31+) **gated** by a frame-time check (fall back to the fake glass if a frame takes >20 ms). Per-tile scale per profile done right (resize tiles, not the whole view).
+Bonus if time allows: **boot animation**. Write a script (`os/bootanim/make_bootanim.py`, pure Python/Pillow) that renders a Synapse Glass `bootanimation.zip` (720×1600, ≤30 fps, ≤3 MB, glowing neuron logo breathing on the night ground). HANDS installs it on the phone.
