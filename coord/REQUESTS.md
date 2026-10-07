@@ -102,14 +102,19 @@ Push results after every step (into R-005/R-006 + `results/`). Never commit the 
 4. **On pass:** run `ha_package.py > results\synapse_livingroom_01.yaml` but don't install it into HA without Mason. Write a short morning summary for Mason in your STATUS: what works, and what needs his eyes, ears or a Power tap.
 Answer:
 
-### R-009 · BRAIN → HANDS · OPEN — fixes for the 3 R-005 bugs (next 0.3.x APK)
+### R-009 · BRAIN → HANDS · DONE (with 2 follow-ups) — fixes for the 3 R-005 bugs (next 0.3.x APK)
 BRAIN fixed all three in code (pushed; CI builds the APK). After `builds/` shows a version > 0.3.11:
 1. **config push EACCES:** provision.py now drops `adb unroot` before pushing config.json (so the app can read it) and deletes it on failure. Re-run provision.py normally (no manual `adb unroot` needed). Confirm the config imports on the **first** run and no config.json is left behind.
 2. **ambient self-wake:** IdleController now ignores sensor wakes for 4 s after entering ambient; real touch still wakes. Re-test: `POST /api/ambient` should stay ambient (not bounce to active in 2 s), and the **130 s idle → auto-ambient** test should now pass. Please capture the idle screenshot.
 3. **thermal avc spam:** NodeService stops polling /sys/class/thermal after the first denial; `cpu_temp` will be null (expected) and the logcat avc spam should stop.
 Also: `ha_token` in `/api/status` and config.result.json is now fully masked `(set)`.
 **TTS (not a code bug):** SherpaTTS needs to be set as the system TTS engine and have a voice model downloaded (its in-app UI, one-time). After that, set it default: `settings put secure tts_default_synth org.woheller69.ttsengine`. Then `/api/status` tts.ready should flip true. Mason can do the voice download when he wants voice; not blocking.
-Answer:
+Answer (HANDS, 08:05 PDT): run on **v6** (R-007 installed; see R-007), APK **0.3.13** (sha aff6e15d…), phone now on its **factory MAC** cc:a2:12:64:92:95, IP 10.0.0.151 (DHCP).
+1. config EACCES: ✅ fixed in the app, but ⚠️ **new provision.py bug: over Wi-Fi ADB, `adb unroot` restarts adbd, so the TCP session drops and every later step gets `device offline`.** 1st run: 3 PASS (falsely: "uid adb.exe: device offline" counted as PASS) then FAIL install/config. Fix: after unroot, `adb disconnect` + `adb connect <serial>` and wait for `get-state == device`; check uid == 2000 numerically. 2nd run (already non-root): **11/11 PASS**, config imported first try, no config.json left.
+2. ambient: ✅ **manual `POST /api/ambient` holds** (ambient at t+1…t+8 s). Screenshot = black screen, large thin "8:00", "Wednesday, October 7", green "● LIVING ROOM", Android nav bar (◀ back) still visible at the bottom ❓ (kiosk should hide it?). **Idle auto-dim ✅:** woke at 08:01:06, `screen=ambient` at 08:03:11 (idle 120 s), and the screenshot shows the same clock. ⚠️ `smoke_test.py` still reported ambient FAIL once (signals `external,touch` from the preceding /api/presence call?). Maybe the smoke-test order should be presence last, or wait 4 s.
+3. thermal avc: ✅ `logcat | grep -c 'avc.*thermal'` = **0**. No AndroidRuntime crashes.
+- tts: ready=false (voice download not done yet; Mason later).
+- HA: 14 entities; `charging=on` (the limiter isn't installed on v6 yet; next step).
 
 ### R-010 · BRAIN → HANDS · OPEN — ⚠️ NEEDS MASON'S OK (reboots) — recovery-first gate for permanent install
 Mason wants to consider removing stock (permanent GSI install). Before ANY destructive flash, prove the way back. See `os/PERMANENT_INSTALL.md`.
