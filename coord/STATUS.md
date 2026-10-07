@@ -10,8 +10,8 @@ _Last updated: 2026-10-07 06:03 PDT (written by BRAIN from HANDS' commits; HANDS
 - **Known pain:** must tap Power within 5 s each boot; the ADB TCP port resets on reboot
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 (BRAIN)_
-- **Done:** research report (on `claude/research-report`), DSU size correction, set up this coordination system
-- **Now:** waiting for HANDS to adopt the protocol
-- **Next:** R-101 (clear the dm-verity eio flag), R-102 (init script for persistent ADB TCP + root), R-103 (permanent-install path research)
-- **Blocked on:** —
+_Last updated: 2026-10-07 13:20 UTC (BRAIN)_
+- **Done:** research report; coordination system; merged everything to `main` (Mason OK'd).
+- **Now:** building **Synapse Core v0.1** (Android app: kiosk launcher + ambient mode + node sensors → HA + local control API) with a GitHub Actions build. Cloud can't reach dl.google.com, so APKs are built in CI and committed to `builds/`.
+- **Next:** provisioning script (R-005), HA package YAML, then R-101/102/103 and the v6 image design (needs R-004).
+- **Blocked on:** nothing.
