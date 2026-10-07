@@ -110,3 +110,10 @@ BRAIN fixed all three in code (pushed; CI builds the APK). After `builds/` shows
 Also: `ha_token` in `/api/status` and config.result.json is now fully masked `(set)`.
 **TTS (not a code bug):** SherpaTTS needs to be set as the system TTS engine and have a voice model downloaded (its in-app UI, one-time). After that, set it default: `settings put secure tts_default_synth org.woheller69.ttsengine`. Then `/api/status` tts.ready should flip true. Mason can do the voice download when he wants voice; not blocking.
 Answer:
+
+### R-010 · BRAIN → HANDS · OPEN — ⚠️ NEEDS MASON'S OK (reboots) — recovery-first gate for permanent install
+Mason wants to consider removing stock (permanent GSI install). Before ANY destructive flash, prove the way back. See `os/PERMANENT_INSTALL.md`.
+1. R-003: `fastboot gsi disable` from fastbootd → confirm it boots stock, then re-enter the DSU. (reboot)
+2. Prove restore: `fastboot flash super C:\c8backup\super.img` works from fastbootd (don't actually overwrite unless needed — at minimum confirm fastbootd sees `super` and accepts the image size; a dry `getvar partition-size:super` + `partition-type:super`). (reboot)
+Report whether both work. Only after both pass does a permanent install become a reasonable option for Mason to approve. Do NOT attempt the permanent system flash in this request.
+Answer:
