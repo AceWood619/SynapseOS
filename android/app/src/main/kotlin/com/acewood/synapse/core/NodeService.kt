@@ -26,6 +26,7 @@ import com.acewood.synapse.logic.EntityIds
 import com.acewood.synapse.logic.Json
 import com.acewood.synapse.logic.NodeActions
 import com.acewood.synapse.logic.NodeConfig
+import com.acewood.synapse.logic.NodePublisher
 import com.acewood.synapse.logic.NodeSensors
 import com.acewood.synapse.logic.PresenceFusion
 import com.acewood.synapse.logic.PublishPolicy
@@ -48,6 +49,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
     private var cfg: NodeConfig? = null
     private var ha: HaClient? = null
     private var policy = PublishPolicy(60_000)
+    private var publisher: NodePublisher? = null
     private val presence = PresenceFusion()
     private var server: ControlServer? = null
     private var speech: Speech? = null
@@ -133,6 +135,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         }
         ha = HaClient(c)
         policy = PublishPolicy(c.heartbeatSeconds * 1000L)
+        publisher = NodePublisher(c.nodeId, c.room, policy)
         if (c.apiKey.isNotEmpty()) {
             server = ControlServer(c.apiPort, ApiRouter(c.apiKey, this)).also { it.start() }
         }
@@ -163,27 +166,19 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         val t = now()
         ble?.let { if (tick % 240 == 0L || !it.running) it.restart() } // Android degrades scans older than 30 min
         if (bleTracker?.snapshot(t)?.anyKnownNear == true) presence.fire(PresenceFusion.Signal.BLE, t)
-        val readings = readings(t)
-        val toSend = ArrayList<Pair<String, String>>()
-        for ((key, pair) in readings) {
-            val (value, extra) = pair
-            if (value == null) continue
-            val spec = NodeSensors.ALL[key] ?: continue
-            if (!policy.shouldSend(key, value, spec.deadband, t)) continue
-            policy.markSent(key, value, t)
-            toSend += EntityIds.entity(spec.domain, c.nodeId, key) to NodeSensors.statePayload(spec, c.nodeId, c.room, value, extra)
-        }
+        val pub = publisher ?: return
+        val toSend = pub.decide(readings(t), t)
         if (toSend.isEmpty()) return
         net.execute {
             val wasReachable = client.reachable
             var ok = true
-            for ((entity, body) in toSend) if (!client.postState(entity, body)) { ok = false; break }
+            for (post in toSend) if (!client.postState(post.entityId, post.body)) { ok = false; break }
             if (ok) {
                 lastPublishOk = System.currentTimeMillis()
-                if (!wasReachable) handler.post { policy.reset() } // HA came back: re-send everything
+                if (!wasReachable) handler.post { pub.resetAfterReconnect() } // HA came back: re-send everything
             } else {
                 publishErrors++
-                handler.post { policy.reset() } // retry the whole set next time
+                handler.post { pub.resetAfterReconnect() } // retry the whole set next time
             }
         }
     }
