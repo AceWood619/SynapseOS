@@ -127,6 +127,18 @@ class Profiles(
         val p = Profile(id, name, role, if (pin.isEmpty()) "" else PinHash.hash(pin, salt), layout)
         return Profiles(salt, list.filterNot { it.id == id } + p, defaultId)
     }
+    /** Upsert used by the admin UI; null PIN means keep the existing hash, never clear it accidentally. */
+    fun upsert(id: String, name: String, role: Role, pin: String?, layout: Layout = Layout()): Profiles {
+        val old = list.firstOrNull { it.id == id }
+        val hash = when {
+            pin != null && pin.isNotEmpty() -> PinHash.hash(pin, salt)
+            pin != null && role == Role.GUEST -> ""
+            old != null -> old.pinHash
+            else -> ""
+        }
+        return Profiles(salt, list.filterNot { it.id == id } + Profile(id, name, role, hash, layout), defaultId)
+    }
+    fun without(id: String): Profiles = Profiles(salt, list.filterNot { it.id == id }, if (defaultId == id) null else defaultId)
 
     companion object {
         @Suppress("UNCHECKED_CAST")

@@ -2,16 +2,21 @@ package com.acewood.synapse.core
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputType
 import android.webkit.CookieManager
 import android.webkit.WebStorage
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import com.acewood.synapse.logic.Json
+import com.acewood.synapse.logic.Role
 
 /** Synapse-native settings and maintenance surface. Only the admin profile can open it. */
 class SettingsActivity : Activity() {
@@ -46,6 +51,8 @@ class SettingsActivity : Activity() {
             text = profileSummary(); textSize = 13f; setTextColor(Glass.INK_DIM)
         }))
         outer.addView(g.spacer(this, h = 12))
+        addAction(outer, "Manage profiles (admin PIN)") { openProfileAdmin() }
+        outer.addView(g.spacer(this, h = 4))
         outer.addView(g.label(this, "MAINTENANCE"))
         outer.addView(g.spacer(this, h = 7))
         addAction(outer, "Reload Synapse dashboard") { NodeBus.send(NodeBus.Command.RELOAD) }
@@ -94,6 +101,22 @@ class SettingsActivity : Activity() {
         val cfg = ConfigStore.load(this) ?: return "Profiles are created after provisioning."
         val ps = ProfileStore.loadOrCreate(this, cfg) ?: return "No profile PIN is configured."
         return ps.list.joinToString("\n") { p -> "${p.name} · ${p.role.name.lowercase()} · ${if (p.pinHash.isEmpty()) "no PIN" else "PIN protected"}" }
+    }
+
+    private fun openProfileAdmin() {
+        val cfg = ConfigStore.load(this) ?: return
+        val profiles = ProfileStore.loadOrCreate(this, cfg)
+        if (profiles == null) { Toast.makeText(this, "Profiles are not configured", Toast.LENGTH_SHORT).show(); return }
+        val input = EditText(this).apply {
+            hint = "Admin PIN"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this).setTitle("Profile admin").setMessage("Enter an admin profile PIN to continue.").setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("UNLOCK") { _, _ ->
+                val admin = profiles.resolve(input.text.toString())?.role == Role.ADMIN
+                if (!admin) Toast.makeText(this, "Admin PIN required", Toast.LENGTH_SHORT).show()
+                else setContentView(ProfileAdminView(this, profiles) { recreate() })
+            }.show()
     }
 
     private fun refreshStatus() {

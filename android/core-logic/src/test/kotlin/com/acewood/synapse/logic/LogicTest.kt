@@ -816,3 +816,14 @@ class AmbientDataTest {
         assertEquals("News", s.nowPlaying?.title)
     }
 }
+
+class ProfileAdminTest {
+    @Test fun editWithBlankPinPreservesHashAndAssignments() {
+        val base = Profiles.starter("Admin", "2468")
+        val next = base.upsert("admin", "Mason", Role.ADMIN, null, Layout(rooms = listOf("living_room"), homeApps = listOf("jarvis")))
+        assertEquals("Mason", "2468".let { next.resolve(it)?.name })
+        assertEquals(listOf("living_room"), next.admin!!.layout.rooms)
+        assertEquals(listOf("jarvis"), next.admin!!.layout.homeApps)
+        assertFalse(next.toJson().contains("2468"))
+    }
+}
