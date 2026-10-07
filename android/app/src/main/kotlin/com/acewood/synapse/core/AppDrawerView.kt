@@ -20,6 +20,7 @@ class AppDrawerView(
     private val onBack: () -> Unit,
     private val onLaunch: (AppCatalog.App) -> Unit,
     private val activeProfile: () -> Profile? = { null },
+    private val onAllOff: () -> Unit = {},
 ) : FrameLayout(context) {
     private val g = Glass
     private val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -42,6 +43,13 @@ class AppDrawerView(
             addView(TextView(context).apply { text = "Apps"; textSize = 22f; setTextColor(Glass.INK); typeface = g.disp(context) })
         })
         outer.addView(g.spacer(context, h = 16))
+        outer.addView(TextView(context).apply {
+            text = "ALL OFF"; textSize = 11f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            background = g.tile(context, Glass.RED, false, 14f)
+            setPadding(g.dp(context, 12f), g.dp(context, 10f), g.dp(context, 12f), g.dp(context, 10f))
+            tap { onAllOff() }
+        })
+        outer.addView(g.spacer(context, h = 10))
         outer.addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(grid) },
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         outer.addView(TextView(context).apply {

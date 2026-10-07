@@ -39,6 +39,8 @@ class HomeView(
     private val onOpenRoom: (Room) -> Unit,
     private val onMic: () -> Unit,
     private val onHome: () -> Unit,
+    private val onRooms: () -> Unit = {},
+    private val onAudio: () -> Unit = {},
     private val onHa: () -> Unit = {},
     private val onApps: () -> Unit = {},
     private val onSensors: () -> Unit = {},
@@ -79,6 +81,7 @@ class HomeView(
     private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val modesWrap = g.col(context)
     private val roomsRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private lateinit var roomsHeader: View
     private val scenesWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val houseWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val dockWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -124,7 +127,8 @@ class HomeView(
         modesWrap.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(modesRow) })
         modesWrap.addView(g.spacer(context, h = 12))
         body.addView(modesWrap)
-        body.addView(g.label(context, "ROOM CHANNELS"))
+        roomsHeader = g.label(context, "ROOM CHANNELS")
+        body.addView(roomsHeader)
         body.addView(g.spacer(context, h = 8))
         body.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(roomsRow) })
         body.addView(g.spacer(context, h = 14))
@@ -147,6 +151,8 @@ class HomeView(
 
     /** The persistent Home key is also useful while already home: return to the dashboard top. */
     fun scrollToTop() { if (::homeScroll.isInitialized) homeScroll.smoothScrollTo(0, 0) }
+    /** Navigate to the room-channel section without opening a specific room. */
+    fun scrollToRooms() { if (::homeScroll.isInitialized) homeScroll.post { homeScroll.smoothScrollTo(0, roomsHeader.top) } }
 
     private fun tv(size: Float, color: Int, tf: Typeface) = TextView(context).apply {
         textSize = size; setTextColor(color); typeface = tf
@@ -213,13 +219,13 @@ class HomeView(
         setPadding(g.dp(context, 10f), g.dp(context, 10f), g.dp(context, 10f), g.dp(context, 10f))
         addView(key("HOME", Glass.INK_DIM) { onHome() })
         addView(g.spacer(context, w = 10))
-        addView(key("APPS", Glass.BLUE) { onApps() })
+        addView(key("ROOMS", Glass.BLUE) { onRooms() })
         addView(g.spacer(context, w = 10))
         addView(micOrb())
         addView(g.spacer(context, w = 10))
-        addView(key("ANNOUNCE", Glass.VIOLET) { onIntercom() })
+        addView(key("AUDIO", Glass.VIOLET) { onAudio() })
         addView(g.spacer(context, w = 10))
-        addView(key("ALL OFF", Glass.RED) { allOff() })
+        addView(key("MORE", Glass.AMBER) { onApps() })
     }
 
     private fun key(text: String, color: Int, onTap: () -> Unit): View = g.col(context).apply {
@@ -508,10 +514,12 @@ class HomeView(
         postDelayed({ v.background = g.tile(context, accent, false, 15f) }, 900)
     }
 
-    private fun allOff() {
+    fun allOffNow() {
         hintLabel.text = "All off"
         val cache = HaRepository.cache ?: return
         val lights = cache.byDomain("light").filter { it.on && !it.entityId.endsWith("_listening_light") }.map { it.entityId }
         if (lights.isNotEmpty()) HaRepository.callService("light", "turn_off", lights)
     }
+
+    private fun allOff() = allOffNow()
 }

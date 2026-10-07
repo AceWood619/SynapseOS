@@ -379,6 +379,8 @@ class MainActivity : Activity() {
                 onOpenRoom = { room -> showRoomPad(room) },
                 onMic = { openAssist() },
                 onHome = { showHome(); home?.scrollToTop() },
+                onRooms = { showHome(); home?.scrollToRooms() },
+                onAudio = { showOverlay(audioView) { it.open() } },
                 onHa = { showHa() },
                 onApps = { showOverlay(drawerView) { it.open() } },
                 onSensors = { showOverlay(sensorsView) { it.open() } },
@@ -418,7 +420,7 @@ class MainActivity : Activity() {
         }
         if (drawerView == null) {
             drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) },
-                activeProfile = { activeProfile }).also { v ->
+                activeProfile = { activeProfile }, onAllOff = { home?.allOffNow() }).also { v ->
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
