@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Synapse Remote — Living Room</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#04060c}
+a{color:#7cc8ff}a:hover{color:#b8e2ff}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 360px; height: 800px; box-sizing: border-box; background: radial-gradient(120% 55% at 50% 0%, #121c44 0%, #070b18 55%, #04060c 100%); color: #e6ecff; font-family: Manrope, sans-serif; display: flex; flex-direction: column; padding: 18px 18px 20px; gap: 14px; overflow: hidden">
+
+<div style="display: flex; align-items: center; justify-content: space-between">
+<a href="Main.dc.html" aria-label="Previous room" style="width: 44px; height: 44px; border-radius: 14px; border: 1px solid rgba(143,163,214,0.3); display: flex; align-items: center; justify-content: center; text-decoration: none; color: #cfe0ff; font-size: 22px">‹</a>
+<div style="display: flex; flex-direction: column; align-items: center">
+<span style="font-family: Rajdhani, sans-serif; font-size: 12px; letter-spacing: 3px; color: #7cc8ff">CHANNEL 1</span>
+<span style="font-family: Rajdhani, sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 1px">Living Room</span>
+<div style="display: flex; gap: 6px; margin-top: 4px"><span style="width: 18px; height: 4px; border-radius: 2px; background: #3ab4ff"></span><span style="width: 6px; height: 4px; border-radius: 2px; background: #2a3658"></span><span style="width: 6px; height: 4px; border-radius: 2px; background: #2a3658"></span></div>
+</div>
+<a href="Main.dc.html" aria-label="Next room" style="width: 44px; height: 44px; border-radius: 14px; border: 1px solid rgba(143,163,214,0.3); display: flex; align-items: center; justify-content: center; text-decoration: none; color: #cfe0ff; font-size: 22px">›</a>
+</div>
+
+<div style="display: flex; justify-content: center; gap: 14px; font-size: 12px; color: #a9b8e3">
+<span>● Occupied 94%</span><span>72°F</span><span>Light 40%</span>
+</div>
+
+<div style="font-family: Rajdhani, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #8fa3d6">LIGHTS</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{lights}}" as="l" hint-placeholder-count="4">
+<button onClick="{{l.pick}}" aria-pressed="{{l.on}}" style="{{l.style}}">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"></path></svg>
+<span style="font-weight: 700; font-size: 14px">{{l.label}}</span>
+<span style="font-size: 11px; opacity: 0.8">{{l.state}}</span>
+</button>
+</sc-for>
+</div>
+
+<div style="font-family: Rajdhani, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #8fa3d6">TV · MEDIA</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 26px; background: linear-gradient(180deg, rgba(20,30,62,0.85), rgba(10,14,30,0.9)); border: 1px solid rgba(124,200,255,0.2)">
+<div style="position: relative; width: 150px; height: 150px; flex-shrink: 0; border-radius: 50%; background: radial-gradient(circle, #0e1530 0%, #0a0f22 100%); border: 1px solid rgba(124,200,255,0.35); box-shadow: 0 0 22px rgba(58,180,255,0.18)">
+<button aria-label="Up" style="position: absolute; left: 53px; top: 6px; width: 44px; height: 40px; border: 0; background: transparent; color: #cfe0ff; font-size: 18px">▲</button>
+<button aria-label="Down" style="position: absolute; left: 53px; bottom: 6px; width: 44px; height: 40px; border: 0; background: transparent; color: #cfe0ff; font-size: 18px">▼</button>
+<button aria-label="Left" style="position: absolute; left: 6px; top: 53px; width: 40px; height: 44px; border: 0; background: transparent; color: #cfe0ff; font-size: 18px">◀</button>
+<button aria-label="Right" style="position: absolute; right: 6px; top: 53px; width: 40px; height: 44px; border: 0; background: transparent; color: #cfe0ff; font-size: 18px">▶</button>
+<button onClick="{{togglePlay}}" aria-label="Play or pause" style="position: absolute; left: 45px; top: 45px; width: 60px; height: 60px; border-radius: 50%; border: 1px solid #3ab4ff; background: radial-gradient(circle at 50% 40%, #3ab4ff, #2a3cff 70%); color: #ffffff; font-family: Rajdhani, sans-serif; font-weight: 700; font-size: 15px; box-shadow: 0 0 18px rgba(58,180,255,0.6)">{{playLabel}}</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1">
+<button onClick="{{volUp}}" aria-label="Volume up" style="height: 50px; border-radius: 16px; border: 1px solid rgba(143,163,214,0.3); background: rgba(255,255,255,0.05); color: #e6ecff; font-size: 22px; font-weight: 700">＋</button>
+<div style="text-align: center; font-family: Rajdhani, sans-serif; font-size: 13px; letter-spacing: 1px; color: #a9b8e3">VOL {{vol}}</div>
+<button onClick="{{volDown}}" aria-label="Volume down" style="height: 50px; border-radius: 16px; border: 1px solid rgba(143,163,214,0.3); background: rgba(255,255,255,0.05); color: #e6ecff; font-size: 22px; font-weight: 700">－</button>
+</div>
+</div>
+
+<div style="flex-grow: 1"></div>
+
+<div style="height: 110px; border-radius: 32px; background: linear-gradient(180deg, rgba(20,30,62,0.9), rgba(10,14,30,0.95)); border: 1px solid rgba(124,200,255,0.22); display: flex; align-items: center; justify-content: space-around; padding: 0 14px">
+<a href="Main.dc.html" aria-label="Home" style="width: 60px; height: 60px; border-radius: 18px; border: 1px solid rgba(143,163,214,0.35); background: rgba(255,255,255,0.05); color: #cfe0ff; display: flex; align-items: center; justify-content: center; text-decoration: none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>
+</a>
+<button aria-label="Talk to Jarvis" style="width: 80px; height: 80px; border-radius: 50%; border: 2px solid #3ab4ff; background: radial-gradient(circle at 50% 40%, #3ab4ff 0%, #2a3cff 55%, #3b1a7a 100%); box-shadow: 0 0 26px rgba(58,180,255,0.55); display: flex; align-items: center; justify-content: center">
+<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+</button>
+<button onClick="{{roomOff}}" aria-label="Room off" style="width: 60px; height: 60px; border-radius: 18px; border: 1px solid rgba(255,107,129,0.55); background: rgba(255,107,129,0.10); color: #ff8fa1; display: flex; align-items: center; justify-content: center">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v8"></path><path d="M6.4 6.6a8 8 0 1 0 11.2 0"></path></svg>
+</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":800}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { on: { 'Ceiling': true, 'Lamp': true, 'TV backlight': true, 'Ivy lights': false }, playing: true, vol: 24 }; }
+  renderVals() {
+    const lights = Object.keys(this.state.on).map((label) => {
+      const on = !!this.state.on[label];
+      return { label, on: on ? 'true' : 'false', state: on ? 'On · 40%' : 'Off',
+        pick: () => this.setState({ on: { ...this.state.on, [label]: !on } }),
+        style: 'height: 92px; border-radius: 20px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 12px 14px; text-align: left; ' +
+          (on ? 'color: #fff6dc; background: linear-gradient(150deg, rgba(255,200,87,0.30), rgba(255,255,255,0.03)); border: 1px solid rgba(255,200,87,0.75); box-shadow: 0 0 18px rgba(255,200,87,0.28);'
+              : 'color: #b6c3e6; background: rgba(255,255,255,0.035); border: 1px solid rgba(143,163,214,0.2);') };
+    });
+    return { lights,
+      playLabel: this.state.playing ? 'PAUSE' : 'PLAY',
+      togglePlay: () => this.setState({ playing: !this.state.playing }),
+      vol: this.state.vol,
+      volUp: () => this.setState({ vol: Math.min(100, this.state.vol + 2) }),
+      volDown: () => this.setState({ vol: Math.max(0, this.state.vol - 2) }),
+      roomOff: () => this.setState({ on: { 'Ceiling': false, 'Lamp': false, 'TV backlight': false, 'Ivy lights': false } }) };
+  }
+}
+</script>
+</body>
+</html>
