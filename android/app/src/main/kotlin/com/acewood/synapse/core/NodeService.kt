@@ -21,6 +21,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import com.acewood.synapse.logic.ApiRouter
+import com.acewood.synapse.logic.BleTracker
 import com.acewood.synapse.logic.EntityIds
 import com.acewood.synapse.logic.Json
 import com.acewood.synapse.logic.NodeActions
@@ -50,6 +51,9 @@ class NodeService : Service(), SensorEventListener, NodeActions {
     private val presence = PresenceFusion()
     private var server: ControlServer? = null
     private var speech: Speech? = null
+    private var bleTracker: BleTracker? = null
+    private var ble: BleScanner? = null
+    private var camera: Snapshotter? = null
     private val startedMs = SystemClock.elapsedRealtime()
 
     // Latest readings (written on the sensor/receiver threads, read on the node thread).
@@ -102,6 +106,8 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         NodeBus.removeEvent(busEvents)
         NodeBus.removeCommand(busCommands)
         server?.stop()
+        ble?.stop()
+        camera?.shutdown()
         speech?.shutdown()
         net.shutdownNow()
         thread.quitSafely()
@@ -118,6 +124,8 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         if (c == cfg && c != null) return
         cfg = c
         server?.stop(); server = null
+        ble?.stop(); ble = null; bleTracker = null
+        camera?.shutdown(); camera = null
         if (c == null) {
             ha = null
             goForeground("Not configured — waiting for config.json")
@@ -128,6 +136,12 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         if (c.apiKey.isNotEmpty()) {
             server = ControlServer(c.apiPort, ApiRouter(c.apiKey, this)).also { it.start() }
         }
+        if (c.bleKnown.isNotEmpty()) {
+            val t = BleTracker(c.bleKnown)
+            bleTracker = t
+            ble = BleScanner(this, t).also { it.start() }
+        }
+        if (c.camera.isNotEmpty()) camera = Snapshotter(this, c.camera)
         goForeground("${c.nodeId} · ${c.room}")
     }
 
@@ -147,6 +161,8 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         val c = cfg ?: return
         val client = ha ?: return
         val t = now()
+        ble?.let { if (tick % 240 == 0L || !it.running) it.restart() } // Android degrades scans older than 30 min
+        if (bleTracker?.snapshot(t)?.anyKnownNear == true) presence.fire(PresenceFusion.Signal.BLE, t)
         val readings = readings(t)
         val toSend = ArrayList<Pair<String, String>>()
         for ((key, pair) in readings) {
@@ -191,6 +207,8 @@ class NodeService : Service(), SensorEventListener, NodeActions {
             "uptime" to (((t - startedMs) / 60_000).toDouble() to emptyMap()),
             "mem_free" to (memFreeMb() to emptyMap()),
             "cpu_temp" to (cpuTemp() to emptyMap()),
+            "ble_devices" to (bleTracker?.snapshot(t)?.devicesSeen?.toDouble() to emptyMap()),
+            "ble_known" to bleKnownReading(t),
             "status" to ("online" to mapOf(
                 "version" to BuildConfigInfo.versionName(this),
                 "ip" to ipAddress(),
@@ -199,6 +217,13 @@ class NodeService : Service(), SensorEventListener, NodeActions {
                 "device_owner" to Kiosk.isDeviceOwner(this),
             )),
         )
+    }
+
+    private fun bleKnownReading(t: Long): Pair<Any?, Map<String, Any?>> {
+        val snap = bleTracker?.snapshot(t) ?: return null to emptyMap()
+        val near = snap.known.filter { it.near }.map { it.name }
+        val devices = snap.known.map { mapOf("name" to it.name, "rssi" to it.rssi, "near" to it.near, "age_s" to it.ageS) }
+        return (if (near.isEmpty()) "none" else near.joinToString(", ")) to mapOf("devices" to devices)
     }
 
     // ---------- sensors ----------
@@ -326,6 +351,9 @@ class NodeService : Service(), SensorEventListener, NodeActions {
             "sensors" to readings(t).mapValues { it.value.first },
             "tts" to mapOf("ready" to speech?.ready, "engine" to speech?.engine),
             "device_owner" to Kiosk.isDeviceOwner(this),
+            "ble" to ble?.let { b -> mapOf("running" to b.running, "error" to b.lastError, "adverts" to b.adverts,
+                "known" to bleTracker?.snapshot(t)?.known?.map { mapOf("name" to it.name, "rssi" to it.rssi, "near" to it.near) }) },
+            "camera" to camera?.let { cam -> mapOf("facing" to c?.camera, "permitted" to cam.permitted(), "last_error" to cam.lastError, "size" to cam.lastSize) },
             "uptime_s" to (t - startedMs) / 1000,
         )
     }
@@ -334,6 +362,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
     override fun ambient() = NodeBus.send(NodeBus.Command.AMBIENT)
     override fun reload() { NodeBus.send(NodeBus.Command.RELOAD); handler.post { reloadConfig() } }
     override fun speak(text: String): Boolean = speech?.speak(text) ?: false
+    override fun snapshot(): ByteArray? = camera?.take()
     override fun presence(source: String) {
         presence.fire(PresenceFusion.Signal.EXTERNAL, now())
         Log.i(SynapseApp.TAG, "external presence from ${Json.write(source)}")

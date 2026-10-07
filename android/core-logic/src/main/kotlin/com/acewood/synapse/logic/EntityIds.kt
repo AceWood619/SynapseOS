@@ -38,6 +38,8 @@ object NodeSensors {
         SensorSpec("uptime", name = "App uptime", unit = "min", stateClass = "measurement", deadband = 5.0, icon = "mdi:timer-outline"),
         SensorSpec("mem_free", name = "Free memory", unit = "MB", stateClass = "measurement", deadband = 50.0, icon = "mdi:memory"),
         SensorSpec("cpu_temp", name = "CPU temperature", unit = "°C", deviceClass = "temperature", stateClass = "measurement", deadband = 1.0),
+        SensorSpec("ble_devices", name = "Bluetooth devices nearby", stateClass = "measurement", deadband = 2.0, icon = "mdi:bluetooth"),
+        SensorSpec("ble_known", name = "Known Bluetooth devices near", icon = "mdi:account-search"),
         SensorSpec("status", name = "Node status", icon = "mdi:access-point-network"),
     ).associateBy { it.key }
 

@@ -21,6 +21,7 @@ class PresenceFusion(
         LIGHT_CHANGE(0.5, 60.0),  // room light switched on or off
         VOICE(1.5, 120.0),        // wake word or voice activity
         EXTERNAL(1.0, 120.0),     // HA or another node says someone's here
+        BLE(0.8, 90.0),           // a known Bluetooth device is near this node
     }
 
     private val lastFired = HashMap<Signal, Long>()

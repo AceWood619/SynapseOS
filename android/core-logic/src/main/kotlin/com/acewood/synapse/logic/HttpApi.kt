@@ -14,14 +14,15 @@ data class HttpRequest(
     val body: String,
 )
 
-data class HttpResponse(val status: Int, val body: String, val contentType: String = "application/json") {
+class HttpResponse(val status: Int, val body: String, val contentType: String = "application/json", val bytes: ByteArray? = null) {
     fun toBytes(): ByteArray {
-        val payload = body.toByteArray(Charsets.UTF_8)
+        val payload = bytes ?: body.toByteArray(Charsets.UTF_8)
         val reason = when (status) {
             200 -> "OK"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
             405 -> "Method Not Allowed"; 413 -> "Payload Too Large"; else -> "Error"
         }
-        val head = "HTTP/1.1 $status $reason\r\nContent-Type: $contentType; charset=utf-8\r\n" +
+        val ct = if (bytes != null) contentType else "$contentType; charset=utf-8"
+        val head = "HTTP/1.1 $status $reason\r\nContent-Type: $ct\r\nCache-Control: no-store\r\n" +
             "Content-Length: ${payload.size}\r\nConnection: close\r\n\r\n"
         return head.toByteArray(Charsets.US_ASCII) + payload
     }
@@ -29,6 +30,7 @@ data class HttpResponse(val status: Int, val body: String, val contentType: Stri
     companion object {
         fun json(status: Int, value: Any?) = HttpResponse(status, Json.write(value))
         fun error(status: Int, msg: String) = json(status, mapOf("ok" to false, "error" to msg))
+        fun binary(contentType: String, data: ByteArray) = HttpResponse(200, "", contentType, data)
     }
 }
 
@@ -89,13 +91,17 @@ interface NodeActions {
     fun speak(text: String): Boolean
     fun reload()
     fun presence(source: String)
+    /** JPEG from the camera, or null if the camera is disabled or busy. */
+    fun snapshot(): ByteArray?
 }
 
 class ApiRouter(private val apiKey: String, private val actions: NodeActions) {
     fun handle(req: HttpRequest): HttpResponse {
         if (req.path == "/api/ping") return HttpResponse.json(200, mapOf("ok" to true))
         if (apiKey.isEmpty()) return HttpResponse.error(401, "control API disabled (no api_key set)")
-        val given = req.headers["x-synapse-key"] ?: bearer(req.headers["authorization"]) ?: ""
+        // HA's generic camera can't send custom headers, so /api/snapshot also accepts ?key=.
+        val queryKey = if (req.path == "/api/snapshot") req.query["key"] else null
+        val given = req.headers["x-synapse-key"] ?: bearer(req.headers["authorization"]) ?: queryKey ?: ""
         if (!constantTimeEquals(given, apiKey)) return HttpResponse.error(401, "bad or missing X-Synapse-Key")
         return try {
             route(req)
@@ -108,6 +114,8 @@ class ApiRouter(private val apiKey: String, private val actions: NodeActions) {
         fun needPost(): HttpResponse? = if (req.method != "POST") HttpResponse.error(405, "use POST") else null
         return when (req.path) {
             "/api/status" -> HttpResponse.json(200, actions.status())
+            "/api/snapshot" -> actions.snapshot()?.let { HttpResponse.binary("image/jpeg", it) }
+                ?: HttpResponse.error(503, "camera disabled or busy")
             "/api/wake" -> needPost() ?: run { actions.wake(); ok() }
             "/api/ambient" -> needPost() ?: run { actions.ambient(); ok() }
             "/api/reload" -> needPost() ?: run { actions.reload(); ok() }

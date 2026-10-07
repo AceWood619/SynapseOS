@@ -23,6 +23,15 @@ Ava (github.com/brownard/Ava, Apache-2.0) turns the phone into an **ESPHome voic
 
 ⚠️ Ava's port 6053 has no authentication (the ESPHome API as server). Keep the phone on a trusted LAN or VLAN.
 
+## BLE presence and camera (v0.3)
+- `--ble "aa:bb:cc:dd:ee:ff=Mason watch"` (repeatable): known devices by MAC, or by iBeacon `uuid:major:minor`. Turn on the HA Companion app's **BLE Transmitter** on your phone; it's an iBeacon, so it survives MAC randomisation.
+  - Adds `sensor.synapse_<node>_ble_known` (who's near) and `_ble_devices` (how many BLE devices are around).
+  - A known device that's near also feeds the occupancy sensor.
+- `--camera back|front` turns on `GET /api/snapshot` (JPEG). Android's green dot shows while it's in use.
+  - In HA: Settings → Devices → Add Integration → **Generic Camera**.
+  - Still image URL: `http://<phone-ip>:8765/api/snapshot?key=<api_key>`. The api_key is in `~/.synapse/<node>.json`.
+  - Works while the Synapse screen is in front, which is always the case in kiosk mode.
+
 ## What it sets up
 | Thing | Where |
 |---|---|

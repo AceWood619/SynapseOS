@@ -139,6 +139,8 @@ class HttpApiTest {
         override fun speak(text: String): Boolean { calls += "speak:$text"; return true }
         override fun reload() { calls += "reload" }
         override fun presence(source: String) { calls += "presence:$source" }
+        var jpeg: ByteArray? = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2)
+        override fun snapshot(): ByteArray? = jpeg
     }
     private fun req(raw: String) = HttpParser.read(ByteArrayInputStream(raw.toByteArray()))
 
@@ -175,5 +177,77 @@ class HttpApiTest {
     @Test fun responseBytes() {
         val s = String(HttpResponse.json(200, mapOf("ok" to true)).toBytes())
         assertTrue(s.startsWith("HTTP/1.1 200 OK\r\n")); assertTrue(s.endsWith("{\"ok\":true}"))
+    }
+}
+
+class SnapshotApiTest {
+    private fun req(raw: String) = HttpParser.read(ByteArrayInputStream(raw.toByteArray()))
+    private class A : NodeActions {
+        var jpeg: ByteArray? = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 9)
+        override fun status() = emptyMap<String, Any?>()
+        override fun wake() {}
+        override fun ambient() {}
+        override fun speak(text: String) = true
+        override fun reload() {}
+        override fun presence(source: String) {}
+        override fun snapshot() = jpeg
+    }
+    @Test fun snapshotWithQueryKeyReturnsJpeg() {
+        val a = A()
+        val r = ApiRouter("0123456789abcdef", a)
+        val resp = r.handle(req("GET /api/snapshot?key=0123456789abcdef HTTP/1.1\r\n\r\n"))
+        assertEquals(200, resp.status)
+        val bytes = resp.toBytes()
+        val head = String(bytes, 0, bytes.size - 3, Charsets.ISO_8859_1)
+        assertTrue(head.contains("Content-Type: image/jpeg\r\n"))
+        assertTrue(head.contains("Content-Length: 3\r\n"))
+        assertEquals(0xD8.toByte(), bytes[bytes.size - 2])
+        a.jpeg = null
+        assertEquals(503, r.handle(req("GET /api/snapshot?key=0123456789abcdef HTTP/1.1\r\n\r\n")).status)
+    }
+    @Test fun queryKeyOnlyAcceptedForSnapshot() {
+        val r = ApiRouter("0123456789abcdef", A())
+        assertEquals(401, r.handle(req("GET /api/status?key=0123456789abcdef HTTP/1.1\r\n\r\n")).status)
+        assertEquals(401, r.handle(req("GET /api/snapshot?key=wrongwrongwrong1 HTTP/1.1\r\n\r\n")).status)
+    }
+}
+
+class BleTest {
+    @Test fun parsesIBeacon() {
+        // 02 15 | uuid(16) | major 0x0001 | minor 0x0102 | tx
+        val uuid = "e2c56db5dffb48d2b060d0f5a71096e0"
+        val bytes = ByteArray(23)
+        bytes[0] = 0x02; bytes[1] = 0x15
+        for (i in 0 until 16) bytes[2 + i] = uuid.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        bytes[18] = 0; bytes[19] = 1; bytes[20] = 1; bytes[21] = 2; bytes[22] = (-59).toByte()
+        assertEquals("e2c56db5-dffb-48d2-b060-d0f5a71096e0:1:258", BleParser.iBeaconId(bytes))
+        assertEquals(null, BleParser.iBeaconId(byteArrayOf(0x02, 0x15)))
+        assertEquals(null, BleParser.iBeaconId(ByteArray(23)))
+    }
+    @Test fun tracksKnownDevicesWithSmoothingAndExpiry() {
+        val t = BleTracker(mapOf("AA:BB:CC:DD:EE:FF" to "Watch", "e2c56db5-dffb-48d2-b060-d0f5a71096e0:1:258" to "Mason phone"))
+        t.onAdvert("aa:bb:cc:dd:ee:ff", -60, null, 0)
+        t.onAdvert("11:22:33:44:55:66", -70, "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0:1:258", 0)
+        t.onAdvert("99:99:99:99:99:99", -90, null, 0)
+        var s = t.snapshot(1_000)
+        assertEquals(3, s.devicesSeen)
+        assertEquals(listOf("Watch", "Mason phone"), s.known.map { it.name })
+        assertTrue(s.anyKnownNear)
+        t.onAdvert("aa:bb:cc:dd:ee:ff", -96, null, 2_000) // one weak packet doesn't knock it out of "near"
+        s = t.snapshot(2_000)
+        assertEquals(-72, s.known.first { it.name == "Watch" }.rssi)
+        assertTrue(s.known.first { it.name == "Watch" }.near)
+        s = t.snapshot(70_000)
+        assertEquals(0, s.devicesSeen)
+        assertTrue(s.known.isEmpty())
+    }
+    @Test fun configParsesBleAndCamera() {
+        val c = NodeConfig.fromJson("""{"node_id":"n","ha_url":"http://h:8123","ha_token":"abcdefghijklmnopqrstuvwxyz0123",
+            "ble_known":{"AA:BB:CC:DD:EE:FF":"Watch"},"camera":"Back"}""")
+        assertEquals(mapOf("aa:bb:cc:dd:ee:ff" to "Watch"), c.bleKnown)
+        assertEquals("back", c.camera)
+        assertTrue(c.validate().isEmpty(), c.validate().toString())
+        assertEquals(c, NodeConfig.fromJson(c.toJson()))
+        assertEquals(1, NodeConfig.fromJson("""{"node_id":"n","ha_url":"http://h","ha_token":"abcdefghijklmnopqrstuvwxyz0123","camera":"side"}""").validate().size)
     }
 }

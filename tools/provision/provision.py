@@ -98,6 +98,10 @@ def main():
     ap.add_argument("--extra-apk", action="append", default=[], help="other APKs to install (SherpaTTS, HA Companion minimal…)")
     ap.add_argument("--device-owner", action="store_true", help="make Synapse the device owner (kiosk lockdown)")
     ap.add_argument("--no-kiosk", action="store_true", help="don't lock the screen to Synapse")
+    ap.add_argument("--ble", action="append", default=[], metavar="ID=NAME",
+                    help="known BLE device for presence: MAC (aa:bb:..) or iBeacon uuid:major:minor, e.g. --ble \"aa:bb:cc:dd:ee:ff=Mason watch\"")
+    ap.add_argument("--camera", choices=["back", "front"], default=None,
+                    help="enable /api/snapshot from this camera (off by default for privacy)")
     ap.add_argument("--companion", action="append", default=[],
                     help="package allowed through kiosk + opened once after boot (e.g. com.example.ava for Ava voice)")
     a = ap.parse_args()
@@ -158,6 +162,15 @@ def main():
         adb.sh(f"pm grant {comp} android.permission.POST_NOTIFICATIONS")
         step(f"companion {comp} ready", comp in adb.sh("dumpsys deviceidle whitelist"))
     adb.sh(f"pm grant {PKG} android.permission.POST_NOTIFICATIONS")
+    if a.ble:
+        for perm in ("BLUETOOTH_SCAN", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"):
+            adb.sh(f"pm grant {PKG} android.permission.{perm}")
+        adb.sh("cmd location set-location-enabled true")
+        adb.sh("svc bluetooth enable")
+        step("BLE ready (location services on)", "true" in adb.sh("cmd location is-location-enabled").lower())
+    if a.camera:
+        adb.sh(f"pm grant {PKG} android.permission.CAMERA")
+        step("camera permission", "CAMERA: granted=true" in adb.sh(f"dumpsys package {PKG} | grep 'android.permission.CAMERA'"))
 
     # 5. start the app once so it creates its external files dir, then push config
     adb.sh(f"am start -n {ACTIVITY}")
@@ -167,6 +180,8 @@ def main():
         "dashboard_path": a.dashboard_path, "idle_seconds": a.idle_seconds, "pin": sec["pin"],
         "api_port": 8765, "api_key": sec["api_key"], "kiosk": not a.no_kiosk,
         "companion_apps": a.companion,
+        "ble_known": dict(x.split("=", 1) if "=" in x else (x, x) for x in a.ble),
+        "camera": a.camera or "",
     }
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
         json.dump(cfg, tf)

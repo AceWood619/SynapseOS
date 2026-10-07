@@ -16,6 +16,10 @@ data class NodeConfig(
     val kiosk: Boolean = true,
     /** Other apps allowed through kiosk mode and opened once after boot so their services start (e.g. Ava voice). */
     val companionApps: List<String> = emptyList(),
+    /** Known BLE devices: MAC or iBeacon "uuid:major:minor" -> name. Empty = BLE scanning off. */
+    val bleKnown: Map<String, String> = emptyMap(),
+    /** Camera snapshots over the control API. Off by default (privacy). "back" or "front". */
+    val camera: String = "",
 ) {
     val slug: String get() = EntityIds.slug(nodeId)
     val dashboardUrl: String get() = haUrl.trimEnd('/') + "/" + dashboardPath.trimStart('/')
@@ -30,6 +34,7 @@ data class NodeConfig(
         if (apiKey.isNotEmpty() && apiKey.length < 16) add("api_key must be >= 16 chars (or empty to disable the control API)")
         if (pin.isNotEmpty() && (pin.length < 4 || !pin.all { it.isDigit() })) add("pin must be 4+ digits")
         if (ambientBrightness !in 0f..1f) add("ambient_brightness must be 0..1")
+        if (camera !in setOf("", "back", "front")) add("camera must be \"\", \"back\" or \"front\"")
         companionApps.filterNot { PACKAGE.matches(it) }.forEach { add("companion_apps: bad package name '$it'") }
     }
 
@@ -40,7 +45,7 @@ data class NodeConfig(
             "dashboard_path" to dashboardPath, "idle_seconds" to idleSeconds,
             "ambient_brightness" to ambientBrightness.toDouble(), "pin" to pin, "api_port" to apiPort,
             "api_key" to apiKey, "heartbeat_seconds" to heartbeatSeconds, "kiosk" to kiosk,
-            "companion_apps" to companionApps,
+            "companion_apps" to companionApps, "ble_known" to bleKnown, "camera" to camera,
         )
     )
 
@@ -50,7 +55,7 @@ data class NodeConfig(
         "ha_token" to if (haToken.isEmpty()) "" else "…" + haToken.takeLast(4),
         "dashboard_path" to dashboardPath, "idle_seconds" to idleSeconds, "api_port" to apiPort,
         "api_key_set" to apiKey.isNotEmpty(), "pin_set" to pin.isNotEmpty(), "kiosk" to kiosk,
-        "companion_apps" to companionApps,
+        "companion_apps" to companionApps, "ble_known" to bleKnown.size, "camera" to camera,
     )
 
     companion object {
@@ -76,6 +81,10 @@ data class NodeConfig(
                 kiosk = bool("kiosk", true),
                 companionApps = (m["companion_apps"] as? List<*>)?.mapNotNull { (it as? String)?.trim() }
                     ?.filter { it.isNotEmpty() }?.distinct() ?: emptyList(),
+                bleKnown = (m["ble_known"] as? Map<*, *>)?.entries
+                    ?.mapNotNull { (k, v) -> (k as? String)?.let { it.trim().lowercase() to (v as? String ?: it) } }
+                    ?.toMap() ?: emptyMap(),
+                camera = str("camera").lowercase(),
             )
         }
     }
