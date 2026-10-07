@@ -6,6 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
+import kotlin.test.assertNotEquals
 
 class JsonTest {
     @Test fun roundTrip() {
@@ -307,5 +309,59 @@ class HaWsTest {
         c.applyStateChanged(e.entity)
         assertEquals("off", c.get("light.kitchen")!!.state)
         assertFalse(c.get("light.kitchen")!!.on)
+    }
+}
+
+class ProfilesTest {
+    private fun ps(vararg specs: Triple<Role, String, String>): Profiles {
+        var p = Profiles(PinHash.newSalt(), emptyList(), null)
+        for ((role, name, pin) in specs) p = p.withProfile(name.lowercase(), name, role, pin)
+        return p
+    }
+    @Test fun roleCapabilities() {
+        assertTrue(Role.ADMIN.canDoAction(2) && Role.ADMIN.canManageProfiles)
+        assertTrue(Role.USER.canDoAction(2) && !Role.USER.canEditSettings && !Role.USER.canManageProfiles)
+        assertFalse(Role.CHILD.canDoAction(1)); assertTrue(Role.CHILD.canDoAction(0) && Role.CHILD.simplified)
+        assertFalse(Role.GUEST.canDoAction(2)); assertTrue(Role.GUEST.canDoAction(0))
+        assertEquals(Role.GUEST, Role.from("nonsense")); assertEquals(Role.ADMIN, Role.from("Admin"))
+    }
+    @Test fun pinHashingSaltedAndStable() {
+        val salt = PinHash.newSalt()
+        val h = PinHash.hash("2468", salt)
+        assertTrue(PinHash.equal(h, PinHash.hash("2468", salt)))         // same salt+pin -> same hash
+        assertFalse(PinHash.equal(h, PinHash.hash("0000", salt)))
+        assertNotEquals(PinHash.hash("2468", PinHash.newSalt()), h)       // different salt -> different hash
+    }
+    @Test fun resolvesActiveUserByPin() {
+        val salt = PinHash.newSalt()
+        val p = Profiles(salt, emptyList(), null)
+            .withProfile("admin", "Mason", Role.ADMIN, "1111")
+            .withProfile("user", "Riah", Role.USER, "2222")
+            .withProfile("child", "Kid", Role.CHILD, "3333", Layout(orientation = "landscape", tileScale = 1.4f))
+            .withProfile("guest", "Guest", Role.GUEST, "4444")
+        assertEquals("Mason", p.resolve("1111")!!.name)
+        assertEquals(Role.CHILD, p.resolve("3333")!!.role)
+        assertEquals("landscape", p.resolve("3333")!!.layout.orientation)
+        assertNull(p.resolve("9999")); assertNull(p.resolve(""))
+        assertEquals("Mason", p.admin!!.name)
+        assertTrue(p.validate().isEmpty(), p.validate().toString())
+    }
+    @Test fun validationCatchesProblems() {
+        val noAdmin = Profiles(PinHash.newSalt(), emptyList(), null).withProfile("u", "U", Role.USER, "1")
+        assertTrue(noAdmin.validate().any { "admin" in it })
+        val salt = PinHash.newSalt()
+        val dup = Profiles(salt, emptyList(), null)
+            .withProfile("admin", "A", Role.ADMIN, "1234")
+            .withProfile("user", "B", Role.USER, "1234")
+        assertTrue(dup.validate().any { "share a PIN" in it }, dup.validate().toString())
+    }
+    @Test fun jsonRoundTrip() {
+        val ps = Profiles.starter("Mason", "2468", "0000")
+        val back = Profiles.fromJson(ps.toJson())
+        assertEquals(2, back.list.size)
+        assertEquals("Mason", back.admin!!.name)
+        assertEquals(Role.ADMIN, back.resolve("2468")!!.role)
+        assertEquals("guest", back.defaultProfile!!.id)
+        assertEquals(1.25f, back.byId("guest")!!.layout.tileScale)
     }
 }
