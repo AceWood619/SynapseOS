@@ -179,3 +179,22 @@ Mason still has to say which apps go on the home screen (asked: Camera, Settings
 - **Next (BRAIN):** OkHttp HaWsClient (connect/auth/resubscribe/optimistic call_service), then the remote UI in phases (theme+logo → RemoteHome w/ All-off & Home keys → room-as-channel swipe pads → media D-pad → Jarvis mic → launcher/app-drawer), keeping HA Lovelace as an "Advanced" tab.
 - **Need from Mason:** (1) which apps on the home screen (he floated Camera, Settings, Jarvis chat, HA, browser, music); (2) room list + entities per room (or infer from HA areas); (3) approve the neuron logo BRAIN will draw. Does NOT need stock removed.
 Answer (R-107 is a build, tracked here + the plan doc).
+
+### HANDS results 09:02 PDT (APK 0.3.15 on v6, IP 10.0.0.151)
+- **R-104 TTS: ✅ VERIFIED.** After reinstall `/api/status` tts = `{ready:true, engine:"org.woheller69.ttsengine"}` on the first poll. `POST /api/speak` → `{ok:true}` and **Mason heard it** ("Good morning Mason. Synapse is online…").
+- R-011.1 provision: two runs over Wi-Fi, both 11/11. The phone was already non-root, so the new unroot→reconnect path wasn't exercised ❓. R-011.2 nav bar: not re-checked yet.
+- R-105 Leave/Return kiosk: not tested yet (needs Mason's 5-tap + PIN).
+- Charge limiter + authenticated Wi-Fi ADB on v6: ✅ installed and verified across a reboot (see R-007).
+- Note: the app was provisioned with `--companion org.woheller69.ttsengine` (needed for the voice download while R-105 was broken).
+
+### R-107 input from HANDS: HA areas → room "channels" (live from HA `/api/template`, 09:01 PDT)
+| Area (id) | Controllable entities |
+|---|---|
+| Living Room (`living_room`) | light.lr_lamp, switch.lr_lamp, media_player.living_room_50_onn_roku_tv, ivy-lights alert switches (ring/motion/hour_ding) |
+| Master bedroom (`master_bedroom`) | light.bedroom, light.cync_lan_694243630_22/185/245, light.zz_cloud_bedroom_led_strip, light.zz_cloud_mb_lamp_top, light.master_bedroom_listening_light, switch.master_bedroom_jarvis_microphone, switch.master_bedroom_jarvis_replies_on_tv, switch.led_strip_led_strip_mitm_mode, media_player.riahs_room_50_onn_roku_tv |
+| Kids Room (`kids_room`) | light.cync_lan_694243630_188, light.zz_cloud_kids_bedroom_light, light.kids_bedroom_listening_light, switch.kids_bedroom_jarvis_microphone, switch.kids_bedroom_jarvis_replies_on_tv, media_player.kids_room_juniors_roku |
+| Dining Room (`dining_room`) | light.cync_lan_694243630_102, light.zz_cloud_dining_room_light, switch.dining_room_dining_room_windows_mute |
+| Hallway (`hallway`) | light.cync_lan_694243630_239, light.zz_cloud_hallway_light |
+| Kitchen (`kitchen`) | (none assigned yet) |
+| Front door, 2018 GMC Terrain (+ status monitor) | (no lights/media) |
+Suggestion: build channels from HA **areas** automatically (skip empty ones). There are duplicates: `zz_cloud_*` lights look like cloud twins of the `cync_lan_*` ones, so hide `zz_*` or let Mason pick per room ❓. Each room's Roku = the D-pad target. Mason still to confirm the room order and the home-screen apps.
