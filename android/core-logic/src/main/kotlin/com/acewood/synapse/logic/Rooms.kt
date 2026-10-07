@@ -25,6 +25,9 @@ data class Room(
     val hasControls get() = lights.isNotEmpty() || switches.isNotEmpty() || media.isNotEmpty() ||
         fans.isNotEmpty() || covers.isNotEmpty() || climate.isNotEmpty() || locks.isNotEmpty() ||
         extras.isNotEmpty() || sensors.isNotEmpty()
+    /** Something you can actually press. Sensor-only areas (e.g. a car) aren't room channels. */
+    val hasPressables get() = lights.isNotEmpty() || switches.isNotEmpty() || extras.isNotEmpty() || media.isNotEmpty() || remotes.isNotEmpty() ||
+        fans.isNotEmpty() || covers.isNotEmpty() || climate.isNotEmpty() || locks.isNotEmpty()
     val primaryMedia get() = media.firstOrNull()
     val primaryRemote get() = remotes.firstOrNull()
 }
@@ -43,7 +46,7 @@ object Rooms {
         val rooms = areas
             .filter { it.id !in cfg.excludedAreas }
             .map { toRoom(it, cfg) }
-            .filter { it.hasControls }
+            .filter { it.hasPressables }
         if (cfg.order.isEmpty()) return rooms
         val rank = cfg.order.withIndex().associate { (i, id) -> id to i }
         return rooms.sortedBy { rank[it.id] ?: (cfg.order.size + rooms.indexOf(it)) }

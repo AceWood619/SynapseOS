@@ -125,6 +125,8 @@ class MainActivity : Activity() {
     companion object {
         /** Process-wide: companions are opened once per boot (or app restart), not on every resume. */
         @Volatile private var companionsLaunched = false
+        /** Companions that must stay lock-task-allowed but never need their activity opened. */
+        private val SERVICE_ONLY_COMPANIONS = setOf("org.woheller69.ttsengine")
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -212,7 +214,8 @@ class MainActivity : Activity() {
      * Open each one for a few seconds, then bring the dashboard back. Once per app process.
      */
     private fun launchCompanionsOnce() {
-        val apps = cfg?.companionApps.orEmpty()
+        // TTS engines work as a bound service; opening their activity only steals the screen (R-119).
+        val apps = cfg?.companionApps.orEmpty().filterNot { it in SERVICE_ONLY_COMPANIONS }
         if (companionsLaunched || apps.isEmpty()) return
         companionsLaunched = true
         var delay = 3_000L

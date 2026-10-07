@@ -343,7 +343,7 @@ class HomeView(
                 layoutParams = LinearLayout.LayoutParams(0, g.dp(context, 56f), 1f).apply {
                     if (i % 2 == 1) leftMargin = g.dp(context, 9f); topMargin = g.dp(context, 9f)
                 }
-                addView(tv(15f, Glass.INK, g.disp(context)).apply { text = s.friendlyName; maxLines = 1 })
+                addView(tv(15f, Glass.INK, g.disp(context)).apply { text = prettyName(s.friendlyName); maxLines = 1 })
             }
             pad.tap { HaRepository.callService("scene", "turn_on", listOf(s.entityId)); flash(pad, accent) }
             rowView?.addView(pad)
@@ -402,6 +402,10 @@ class HomeView(
         val rem = apps.size % 3
         if (rem != 0) repeat(3 - rem) { row?.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f)) }
     }
+
+    /** "night_hold" -> "Night Hold" when HA only has the raw id as the name. */
+    private fun prettyName(n: String): String =
+        if (n.contains('_') && !n.contains(' ')) n.split('_').filter { it.isNotBlank() }.joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) } else n
 
     private fun flash(v: View, accent: Int) {
         v.background = g.tile(context, accent, true, 15f)

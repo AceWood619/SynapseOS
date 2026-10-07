@@ -731,3 +731,13 @@ class ConversationTest {
         assertEquals("(no reply)", HaWs.conversationReply(null).first)
     }
 }
+
+class SensorOnlyAreaTest {
+    @Test fun carAreaIsNotAChannel() {
+        val rooms = Rooms.build(listOf(
+            Area("2018_gmc_terrain", "2018 GMC Terrain", listOf("sensor.terrain_fuel", "binary_sensor.terrain_locked")),
+            Area("living_room", "Living Room", listOf("light.lr_lamp", "sensor.lr_temp")),
+        ))
+        assertEquals(listOf("living_room"), rooms.map { it.id })
+    }
+}
