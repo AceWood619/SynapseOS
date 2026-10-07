@@ -33,6 +33,22 @@ object HaWs {
         return Json.write(m)
     }
 
+    /** Ask HA's conversation agent (Assist / Jarvis) something in plain text. */
+    fun conversationMessage(id: Long, text: String, conversationId: String? = null, agentId: String? = null): String {
+        val m = linkedMapOf<String, Any?>("id" to id, "type" to "conversation/process", "text" to text, "language" to "en")
+        if (conversationId != null) m["conversation_id"] = conversationId
+        if (agentId != null) m["agent_id"] = agentId
+        return Json.write(m)
+    }
+
+    /** Pull the spoken reply + conversation id out of a conversation/process result. */
+    @Suppress("UNCHECKED_CAST")
+    fun conversationReply(result: Map<String, Any?>?): Pair<String, String?> {
+        val resp = result?.get("response") as? Map<String, Any?>
+        val speech = ((resp?.get("speech") as? Map<String, Any?>)?.get("plain") as? Map<String, Any?>)?.get("speech") as? String
+        return (speech?.takeIf { it.isNotBlank() } ?: "(no reply)") to (result?.get("conversation_id") as? String)
+    }
+
     fun pingMessage(id: Long): String = Json.write(linkedMapOf("id" to id, "type" to "ping"))
 
     sealed class Frame {
@@ -42,7 +58,9 @@ object HaWs {
         /** A reply to one of our commands. states is set for a get_states result; rows is the raw
          *  result array (registry lists etc.) matched to the request id. */
         data class Result(val id: Long, val success: Boolean, val states: List<Entity>?, val error: String?,
-                          val rows: List<Map<String, Any?>>? = null) : Frame()
+                          val rows: List<Map<String, Any?>>? = null,
+                          /** The result when it's an object (e.g. conversation/process), else null. */
+                          val obj: Map<String, Any?>? = null) : Frame()
         /** A state_changed event carrying the entity's new state (null if the entity was removed). */
         data class StateChanged(val entity: Entity?) : Frame()
         object Pong : Frame()
@@ -64,7 +82,7 @@ object HaWs {
                 val states = (result as? List<Any?>)?.mapNotNull { Entity.fromState(it as? Map<String, Any?>) }
                 val rows = (result as? List<Any?>)?.mapNotNull { it as? Map<String, Any?> }
                 val err = (m["error"] as? Map<String, Any?>)?.get("message") as? String
-                Frame.Result(id, m["success"] == true, states, err, rows)
+                Frame.Result(id, m["success"] == true, states, err, rows, result as? Map<String, Any?>)
             }
             "event" -> {
                 val event = m["event"] as? Map<String, Any?>

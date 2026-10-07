@@ -34,9 +34,11 @@ object Kiosk {
         try {
             val companions = ConfigStore.load(ctx)?.companionApps.orEmpty()
             val extra = if (kioskPaused()) listOf("com.android.settings") else emptyList()
-            dpm.setLockTaskPackages(a, (listOf(ctx.packageName) + companions + extra).distinct().toTypedArray())
-            // Keep the power menu so the phone can still be shut down by hand.
-            dpm.setLockTaskFeatures(a, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+            // Apps on the Synapse dock/drawer (camera, clock, browser…) may open inside the kiosk.
+            val dockApps = AppCatalog.lockTaskPackages(ctx)
+            dpm.setLockTaskPackages(a, (listOf(ctx.packageName) + companions + dockApps + extra).distinct().toTypedArray())
+            // Keep the power menu, and a working Home button so any opened app can always return to Synapse.
+            dpm.setLockTaskFeatures(a, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or DevicePolicyManager.LOCK_TASK_FEATURE_HOME)
             val home = IntentFilter(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
                 addCategory(Intent.CATEGORY_DEFAULT)

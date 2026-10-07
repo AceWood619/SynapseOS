@@ -46,6 +46,8 @@ class HaWsClient(
     private var areaRows: List<Map<String, Any?>>? = null
     private var entityRows: List<Map<String, Any?>>? = null
     private var deviceRows: List<Map<String, Any?>>? = null
+    /** One-shot reply handlers for request/response commands (conversation etc.), by request id. */
+    private val pending = java.util.concurrent.ConcurrentHashMap<Long, (HaWs.Frame.Result) -> Unit>()
 
     private fun wsUrl(): String {
         val base = cfg.haUrl.trimEnd('/')
@@ -104,7 +106,11 @@ class HaWsClient(
                     areaReqId -> { areaRows = f.rows ?: emptyList(); maybeBuildAreas() }
                     entityReqId -> { entityRows = f.rows ?: emptyList(); maybeBuildAreas() }
                     deviceReqId -> { deviceRows = f.rows ?: emptyList(); maybeBuildAreas() }
-                    else -> { val st = f.states; if (st != null) { cache.applyStates(st); onChange() } }
+                    else -> {
+                        val cb = pending.remove(f.id)
+                        if (cb != null) { runCatching { cb(f) } }
+                        else { val st = f.states; if (st != null) { cache.applyStates(st); onChange() } }
+                    }
                 }
             }
             is HaWs.Frame.StateChanged -> { cache.applyStateChanged(f.entity); onChange() }
@@ -124,6 +130,17 @@ class HaWsClient(
     fun callService(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap()) {
         if (!authed || entityIds.isEmpty()) return
         ws?.send(HaWs.callServiceMessage(id.getAndIncrement(), domain, service, data, mapOf("entity_id" to entityIds)))
+    }
+
+    /** Send text to HA Assist (Jarvis). onReply gets (speech, conversationId) or an error string. */
+    fun converse(text: String, conversationId: String?, onReply: (String, String?) -> Unit) {
+        if (!authed) { onReply("Home Assistant isn't connected right now.", conversationId); return }
+        val rid = id.getAndIncrement()
+        pending[rid] = { f ->
+            if (f.success) { val (speech, conv) = HaWs.conversationReply(f.obj); onReply(speech, conv ?: conversationId) }
+            else onReply("Jarvis error: ${f.error ?: "unknown"}", conversationId)
+        }
+        ws?.send(HaWs.conversationMessage(rid, text, conversationId))
     }
 
     fun toggle(entityIds: List<String>, on: Boolean) {

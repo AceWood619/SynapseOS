@@ -713,3 +713,21 @@ class ResilientPairingByNameTest {
         assertEquals("light.cync_lan_9", pairs[0].local); assertEquals("light.zz_cloud_hallway", pairs[0].cloud)
     }
 }
+
+class ConversationTest {
+    @Test fun buildsConversationMessage() {
+        val m = Json.parseObject(HaWs.conversationMessage(9, "turn off the lights", "abc"))
+        assertEquals("conversation/process", m["type"]); assertEquals("turn off the lights", m["text"])
+        assertEquals("abc", m["conversation_id"]); assertEquals("en", m["language"])
+    }
+    @Test fun parsesReplyAndObjectResult() {
+        val raw = """{"id":9,"type":"result","success":true,"result":{"response":{"speech":{"plain":{"speech":"Turned off 3 lights"}}},"conversation_id":"c1"}}"""
+        val f = HaWs.parse(raw) as HaWs.Frame.Result
+        assertTrue(f.success)
+        val (speech, conv) = HaWs.conversationReply(f.obj)
+        assertEquals("Turned off 3 lights", speech); assertEquals("c1", conv)
+    }
+    @Test fun emptyReplyFallsBack() {
+        assertEquals("(no reply)", HaWs.conversationReply(null).first)
+    }
+}

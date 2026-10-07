@@ -51,6 +51,22 @@ class MainActivity : Activity() {
     private lateinit var splash: LinearLayout
     private var home: HomeView? = null
     private var roomPad: RoomPadView? = null
+    private var sensorsView: SensorsView? = null
+    private var jarvisView: JarvisView? = null
+    private var drawerView: AppDrawerView? = null
+    /** Coalesces HA updates: at most one UI refresh per 350 ms, however chatty the house is. */
+    private var refreshQueued = false
+    private val haListener: () -> Unit = {
+        if (!refreshQueued) {
+            refreshQueued = true
+            ui.postDelayed({
+                refreshQueued = false
+                home?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+            }, 350)
+        }
+    }
     private var haHomeChip: TextView? = null
     private var brightnessAnim: ValueAnimator? = null
     private var pageReady = false
@@ -172,6 +188,8 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         NodeBus.removeCommand(commands)
+        HaRepository.removeListener(haListener)
+        jarvisView?.close()
         ui.removeCallbacksAndMessages(null)
         web.destroy()
         NodeBus.screenMode = "off"
@@ -237,7 +255,12 @@ class MainActivity : Activity() {
 
     @Deprecated("Back is handled inside the dashboard")
     override fun onBackPressed() {
-        if (web.canGoBack()) web.goBack()
+        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, drawerView).any { it?.visibility == View.VISIBLE }
+        when {
+            overlayOpen -> showHome()
+            web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
+            web.visibility == View.VISIBLE -> showHome()
+        }
     }
 
     // ---------- touch, idle and ambient ----------
@@ -322,9 +345,9 @@ class MainActivity : Activity() {
         if (cornerTaps >= 5) { cornerTaps = 0; askPin() }
     }
 
-    private fun askPin() {
+    private fun askPin(onOk: () -> Unit = { openSettings() }) {
         val pin = cfg?.pin.orEmpty()
-        if (pin.isEmpty()) { openSettings(); return }
+        if (pin.isEmpty()) { onOk(); return }
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
             hint = "PIN"
@@ -333,7 +356,7 @@ class MainActivity : Activity() {
             .setTitle("Synapse settings")
             .setView(input)
             .setPositiveButton("OK") { _, _ ->
-                if (input.text.toString() == pin) openSettings()
+                if (input.text.toString() == pin) onOk()
                 else Toast.makeText(this, "Wrong PIN", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
@@ -364,16 +387,33 @@ class MainActivity : Activity() {
                 onOpenRoom = { room -> showRoomPad(room) },
                 onMic = { openAssist() },
                 onHome = { showHome() },
-                onHa = { showHa() }).also { h ->
+                onHa = { showHa() },
+                onApps = { showOverlay(drawerView) { it.open() } },
+                onSensors = { showOverlay(sensorsView) { it.open() } },
+                onLaunch = { app -> launchApp(app) }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
-                HaRepository.onChange { h.refresh() }
             }
+            HaRepository.onChange(haListener)
         }
         if (roomPad == null) {
             roomPad = RoomPadView(this, onBack = { showHome() }).also { p ->
                 p.visibility = View.GONE
                 root.addView(p, FrameLayout.LayoutParams(-1, -1))
-                HaRepository.onChange { if (p.visibility == View.VISIBLE) p.refresh() }
+            }
+        }
+        if (sensorsView == null) {
+            sensorsView = SensorsView(this, c.nodeId, onBack = { showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (jarvisView == null) {
+            jarvisView = JarvisView(this, onBack = { showHome() }, onVoice = { openAssist() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (drawerView == null) {
+            drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
         if (haHomeChip == null) {
@@ -384,7 +424,7 @@ class MainActivity : Activity() {
                 val padH = Glass.dp(this@MainActivity, 16f); val padV = Glass.dp(this@MainActivity, 9f)
                 setPadding(padH, padV, padH, padV)
                 visibility = View.GONE
-                setOnClickListener { try { performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}; showHome() }
+                tap { showHome() }
                 root.addView(this, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply {
                     topMargin = Glass.dp(this@MainActivity, 14f); rightMargin = Glass.dp(this@MainActivity, 14f)
@@ -395,20 +435,54 @@ class MainActivity : Activity() {
         showHome()
         hideSplash()
         val url = c.dashboardUrl + (if (c.dashboardUrl.contains('?')) "&" else "?") + "external_auth=1"
+        haPathLoaded = null
         web.loadUrl(url)
         applyMode()
     }
 
-    private fun showHome() { home?.let { it.visibility = View.VISIBLE; it.bringToFront() }; web.visibility = View.GONE
-        roomPad?.visibility = View.GONE; haHomeChip?.visibility = View.GONE
+    private fun hideOverlays() {
+        roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+    }
+    private fun showHome() { hideOverlays(); home?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
+        haHomeChip?.visibility = View.GONE
         ambient.bringToFront(); splash.bringToFront() }
-    private fun showRoomPad(room: com.acewood.synapse.logic.Room) {
-        roomPad?.let { it.open(room); it.visibility = View.VISIBLE; it.bringToFront() }
-        home?.visibility = View.GONE; web.visibility = View.GONE; haHomeChip?.visibility = View.GONE
+    /** Show one full-screen Synapse overlay (sensors, Jarvis, app drawer) over the home screen. */
+    private fun <T : View> showOverlay(v: T?, prepare: (T) -> Unit = {}) {
+        if (v == null) return
+        hideOverlays(); home?.visibility = View.GONE; web.visibility = View.GONE; haHomeChip?.visibility = View.GONE
+        v.visibility = View.VISIBLE; v.bringToFront(); prepare(v)
         ambient.bringToFront(); splash.bringToFront()
     }
-    private fun showHa() { web.visibility = View.VISIBLE; web.bringToFront(); home?.visibility = View.GONE
-        roomPad?.visibility = View.GONE
+    /** Open a dock/drawer entry: a Synapse screen, a kiosk-allowed Android app, or (admin) a PIN-gated one. */
+    private fun launchApp(app: AppCatalog.App) {
+        val run = {
+            when (val t = app.target) {
+                is AppCatalog.Target.Internal -> when (t.id) {
+                    "jarvis" -> showOverlay(jarvisView)
+                    "sensors" -> showOverlay(sensorsView) { it.open() }
+                    "ha" -> showHa()
+                    "music" -> showHa("/media-browser/browser")
+                    "settings" -> openSettings()
+                }
+                is AppCatalog.Target.Pkg -> {
+                    if (app.adminOnly) { Kiosk.pauseKiosk(); Kiosk.applyPolicies(this) }
+                    if (!AppCatalog.launch(this, t.pkg)) Toast.makeText(this, "${app.label} isn't available", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        if (app.adminOnly) askPin { run() } else run()
+    }
+    private fun showRoomPad(room: com.acewood.synapse.logic.Room) = showOverlay(roomPad) { it.open(room) }
+    private var haPathLoaded: String? = null
+    private fun showHa(path: String? = null) {
+        val c = cfg
+        if (c != null && path != haPathLoaded) {
+            haPathLoaded = path
+            val base = if (path == null) c.dashboardUrl else c.haUrl.trimEnd('/') + path
+            web.loadUrl(base + (if (base.contains('?')) "&" else "?") + "external_auth=1")
+        }
+        hideOverlays(); web.visibility = View.VISIBLE; web.bringToFront(); home?.visibility = View.GONE
         haHomeChip?.let { it.visibility = View.VISIBLE; it.bringToFront() }
         ambient.bringToFront(); splash.bringToFront() }
     private fun openAssist() {
@@ -416,7 +490,7 @@ class MainActivity : Activity() {
             startActivity(android.content.Intent(android.content.Intent.ACTION_VOICE_COMMAND).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: Exception) {
             try { startActivity(android.content.Intent("android.intent.action.ASSIST").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            catch (_: Exception) { android.util.Log.w(SynapseApp.TAG, "no assist app") }
+            catch (_: Exception) { android.util.Log.w(SynapseApp.TAG, "no assist app; opening Jarvis chat"); showOverlay(jarvisView) }
         }
     }
 

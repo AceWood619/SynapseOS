@@ -44,9 +44,38 @@ object HaRepository {
         rooms = Rooms.build(areas, cfg)
     }
 
-    fun toggle(entityIds: List<String>, on: Boolean) = client?.toggle(entityIds, on)
-    fun callService(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap()) =
+    /** Toggle with an optimistic local update, so the key lights up instantly; HA's own echo confirms it. */
+    fun toggle(entityIds: List<String>, on: Boolean) {
+        optimistic(entityIds, if (on) "on" else "off")
+        client?.toggle(entityIds, on)
+    }
+    fun callService(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap()) {
+        when (service) {
+            "turn_on" -> if (domain in OPTIMISTIC_DOMAINS) optimistic(entityIds, "on")
+            "turn_off" -> if (domain in OPTIMISTIC_DOMAINS) optimistic(entityIds, "off")
+        }
         client?.callService(domain, service, entityIds, data)
+    }
+
+    fun converse(text: String, conversationId: String?, onReply: (String, String?) -> Unit) {
+        val c = client
+        if (c == null) onReply("Home Assistant isn't connected right now.", conversationId) else c.converse(text, conversationId, onReply)
+    }
+
+    private val OPTIMISTIC_DOMAINS = setOf("light", "switch", "input_boolean", "fan")
+
+    /** Flip the cached state right away (UI only). The real state_changed from HA overwrites it. */
+    private fun optimistic(entityIds: List<String>, state: String) {
+        val c = cache ?: return
+        if (client?.connected != true) return
+        var changed = false
+        for (id in entityIds) {
+            val e = c.get(id) ?: continue
+            if (e.state == "unavailable" || e.state == state) continue
+            c.applyStateChanged(e.copy(state = state)); changed = true
+        }
+        if (changed) notifyChanged()
+    }
 
     private fun notifyChanged() { listeners.forEach { runCatching { it() } } }
 }

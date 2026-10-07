@@ -71,3 +71,24 @@ object Glass {
         layoutParams = LinearLayout.LayoutParams(if (w > 0) dp(ctx, w.toFloat()) else 0, if (h > 0) dp(ctx, h.toFloat()) else 0)
     }
 }
+
+/**
+ * Remote-style button feel: haptic + a quick "press-in" the moment the finger lands (ACTION_DOWN),
+ * not on release. That's what makes a key feel instant even while HA is still answering.
+ * The action itself still runs on click (so scrolling past a key doesn't fire it).
+ */
+@android.annotation.SuppressLint("ClickableViewAccessibility")
+fun View.tap(action: () -> Unit) {
+    setOnTouchListener { v, ev ->
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                try { v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}
+                v.animate().cancel(); v.animate().scaleX(0.94f).scaleY(0.94f).alpha(0.82f).setDuration(55).start()
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL ->
+                v.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(110).start()
+        }
+        false
+    }
+    setOnClickListener { action() }
+}

@@ -73,13 +73,30 @@ class RoomPadView(
     private fun cacheTargets(t: RoomControl.LightTile) =
         HaRepository.cache?.let { t.light.commandTargets(it, both = false) } ?: t.light.entityIds
 
-    fun open(r: Room) { room = r; refresh() }
+    fun open(r: Room) { room = r; lastSig = null; refresh() }
+
+    private var lastSig: String? = null
+
+    /** Only the entities this room shows; a change anywhere else in the house shouldn't rebuild the pad. */
+    private fun signature(r: Room, cache: com.acewood.synapse.logic.EntityCache): String = buildString {
+        append(r.id)
+        (r.lights + r.switches + r.media + r.extras + r.remotes + r.fans + r.covers + r.climate + r.locks + r.sensors).forEach { id ->
+            val e = cache.get(id); append('|').append(id).append('=').append(e?.state)
+            if (e != null) {
+                append(e.attributes["brightness"]); append(e.attributes["volume_level"]); append(e.attributes["media_title"])
+                append(e.attributes["percentage"]); append(e.attributes["current_position"]); append(e.attributes["temperature"])
+            }
+        }
+    }
 
     fun refresh() {
         if (dragging) return
         post {
             val r = room ?: return@post
             val cache = HaRepository.cache ?: return@post
+            val sig = signature(r, cache)
+            if (sig == lastSig) return@post
+            lastSig = sig
             val m = RoomControl.build(r, cache)
             title.text = r.name
             subtitle.text = buildString {
@@ -157,8 +174,8 @@ class RoomPadView(
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(c); setStroke(g.dp(context, 1f), Glass.STROKE) }
                 val s = g.dp(context, 30f)
                 layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 8f) }
-                setOnClickListener {
-                    haptic(); HaRepository.callService("light", "turn_on", cacheTargets(t), mapOf("rgb_color" to listOf(rgb[0], rgb[1], rgb[2])))
+                tap {
+                    HaRepository.callService("light", "turn_on", cacheTargets(t), mapOf("rgb_color" to listOf(rgb[0], rgb[1], rgb[2])))
                 }
             })
         }
@@ -345,7 +362,7 @@ class RoomPadView(
             text = if (on) "⏻" else "○"; gravity = Gravity.CENTER
             background = g.tile(context, accent, on, 13f)
             val s = g.dp(context, 46f); layoutParams = LinearLayout.LayoutParams(s, s)
-            setOnClickListener { haptic(); onTap() }
+            tap { onTap() }
         }
 
     private fun roundKey(label: String, accent: Int = Glass.INK_DIM, onTap: () -> Unit): View =
@@ -354,7 +371,7 @@ class RoomPadView(
             background = g.tile(context, accent, false, 13f)
             minHeight = g.dp(context, 44f); minimumHeight = g.dp(context, 44f)
             setPadding(g.dp(context, 14f), 0, g.dp(context, 14f), 0)
-            setOnClickListener { haptic(); onTap() }
+            tap { onTap() }
         }
 
     // bigger square D-pad key
@@ -363,7 +380,7 @@ class RoomPadView(
             text = label; gravity = Gravity.CENTER
             background = g.tile(context, if (accent == Glass.BLUE) Glass.BLUE else Glass.INK_DIM, accent == Glass.BLUE, 16f)
             val s = g.dp(context, 68f); layoutParams = LinearLayout.LayoutParams(s, s)
-            setOnClickListener { haptic(); onTap() }
+            tap { onTap() }
         }
 
     private fun send(c: com.acewood.synapse.logic.HaCall) {
@@ -376,6 +393,6 @@ class RoomPadView(
             setText(text); gravity = Gravity.CENTER; letterSpacing = 0.08f
             background = g.tile(context, color, false, 14f)
             setPadding(g.dp(context, 16f), g.dp(context, 11f), g.dp(context, 16f), g.dp(context, 11f))
-            setOnClickListener { haptic(); onTap() }
+            tap { onTap() }
         }
 }

@@ -4,25 +4,28 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextClock
 import android.widget.TextView
 import com.acewood.synapse.logic.Entity
 import com.acewood.synapse.logic.EntityCache
 import com.acewood.synapse.logic.NodeConfig
-import com.acewood.synapse.logic.ResilientLight
 import com.acewood.synapse.logic.Room
 import com.acewood.synapse.logic.RoomOrder
 import java.util.Calendar
 
 /**
- * The native Synapse Glass home screen — "a remote for the house". Renders live from HaRepository:
- * greeting hero, room channels (smart-ordered), scene pads, and the thumb console (Home · mic · All off).
- * Built in Views for speed on the GE8320. Call [refresh] on HA updates.
+ * The native Synapse Glass home screen — "a remote for the house". Live from HaRepository:
+ * status strip (weather · clock · HA · profile), hero (greeting, summary, now playing), house modes,
+ * room channels, scenes, house status + sensors, an app dock, and the thumb console
+ * (Home · Apps · mic · Jarvis · All off). Only rebuilds when something it shows actually changed,
+ * which keeps taps snappy on the GE8320.
  */
 @SuppressLint("ViewConstructor")
 class HomeView(
@@ -32,61 +35,100 @@ class HomeView(
     private val onMic: () -> Unit,
     private val onHome: () -> Unit,
     private val onHa: () -> Unit = {},
+    private val onApps: () -> Unit = {},
+    private val onSensors: () -> Unit = {},
+    private val onLaunch: (AppCatalog.App) -> Unit = {},
 ) : FrameLayout(context) {
 
     private val g = Glass
     private val greeting = tv(23f, Glass.INK, g.disp(context))
     private val summary = tv(12.5f, Glass.INK_DIM, g.light(context))
+    private val nowPlaying = tv(12f, Glass.MINT, g.body(context)).apply { maxLines = 1; visibility = View.GONE }
+    private val weatherChip = tv(12f, Glass.AMBER, g.disp(context)).apply { visibility = View.GONE }
+    private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private val modesWrap = g.col(context)
     private val roomsRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val scenesWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val houseWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val dockWrap = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val hintLabel = tv(11.5f, Glass.INK_FAINT, g.body(context)).apply { gravity = Gravity.CENTER }
     private var activeRoomId: String? = null
+    private var lastSig: String? = null
+
+    /** House-wide status lights shown as pills (missing ones are skipped). */
+    private val housePills = listOf(
+        "binary_sensor.internet" to "Internet", "binary_sensor.xfinity_router" to "Router",
+        "binary_sensor.someone_home" to "Someone home", "binary_sensor.dining_pc_online" to "Dining PC",
+        "binary_sensor.ps5_power" to "PS5", "binary_sensor.raspberry_pi_power_status" to "Pi power",
+    )
+
+    /** House modes (HA input_booleans). Game mode runs its scripts when they exist. */
+    private val modes = listOf(
+        Triple("input_boolean.away_mode", "Away", Glass.BLUE), Triple("input_boolean.sleep_mode", "Sleep", Glass.VIOLET),
+        Triple("input_boolean.movie_mode", "Movie", Glass.INDIGO), Triple("input_boolean.quiet_mode", "Quiet", Glass.MINT),
+        Triple("input_boolean.guest_mode", "Guest", Glass.AMBER), Triple("input_boolean.party_mode", "Party", Glass.RED),
+        Triple("input_boolean.game_mode", "Game", Glass.MINT),
+    )
 
     init {
         background = g.ground()
         val pad = g.dp(context, 16f)
         val col = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, g.dp(context, 14f), pad, g.dp(context, 14f))
+            setPadding(pad, g.dp(context, 14f), pad, g.dp(context, 12f))
         }
         addView(col, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-
-        // status strip
         col.addView(statusStrip())
-        col.addView(g.spacer(context, h = 12))
-        // hero
-        col.addView(hero())
-        col.addView(g.spacer(context, h = 14))
-        // rooms
-        col.addView(g.label(context, "ROOM CHANNELS"))
-        col.addView(g.spacer(context, h = 8))
-        col.addView(HorizontalScrollView(context).apply {
-            isHorizontalScrollBarEnabled = false; addView(roomsRow)
-        })
-        col.addView(g.spacer(context, h = 14))
-        // scenes
-        col.addView(g.label(context, "SCENES"))
-        col.addView(g.spacer(context, h = 8))
-        col.addView(scenesWrap)
-        // push console to bottom
-        col.addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
+        col.addView(g.spacer(context, h = 10))
+
+        val body = g.col(context)
+        col.addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(body) },
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        body.addView(hero())
+        body.addView(g.spacer(context, h = 12))
+        modesWrap.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(modesRow) })
+        modesWrap.addView(g.spacer(context, h = 12))
+        body.addView(modesWrap)
+        body.addView(g.label(context, "ROOM CHANNELS"))
+        body.addView(g.spacer(context, h = 8))
+        body.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(roomsRow) })
+        body.addView(g.spacer(context, h = 14))
+        body.addView(g.label(context, "SCENES"))
+        body.addView(scenesWrap)
+        body.addView(g.spacer(context, h = 14))
+        body.addView(sectionHeader("HOUSE", "Sensors ›") { onSensors() })
+        body.addView(houseWrap)
+        body.addView(g.spacer(context, h = 14))
+        body.addView(sectionHeader("APPS", "All apps ›") { onApps() })
+        body.addView(g.spacer(context, h = 10))
+        body.addView(dockWrap)
+        body.addView(g.spacer(context, h = 10))
+
         col.addView(hintLabel)
         col.addView(g.spacer(context, h = 6))
         col.addView(console())
+        buildDock()
     }
 
     private fun tv(size: Float, color: Int, tf: Typeface) = TextView(context).apply {
         textSize = size; setTextColor(color); typeface = tf
     }
 
+    private fun sectionHeader(label: String, action: String, onTap: () -> Unit): View = g.row(context).apply {
+        addView(g.label(context, label), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(tv(12.5f, Glass.BLUE, g.disp(context)).apply {
+            text = action; setPadding(g.dp(context, 12f), g.dp(context, 6f), 0, g.dp(context, 6f)); tap { onTap() }
+        })
+    }
+
     private fun statusStrip(): View = g.row(context).apply {
-        val dot = View(context).apply {
-            background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Glass.MINT) }
+        addView(View(context).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Glass.MINT) }
             layoutParams = LinearLayout.LayoutParams(g.dp(context, 7f), g.dp(context, 7f)).apply { rightMargin = g.dp(context, 8f) }
-        }
-        addView(dot)
-        addView(tv(12f, Glass.INK_DIM, g.disp(context)).apply { text = "SYNAPSE · HOME"; letterSpacing = 0.15f })
+        })
+        addView(tv(12f, Glass.INK_DIM, g.disp(context)).apply { text = "SYNAPSE"; letterSpacing = 0.15f })
         addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
+        addView(weatherChip.apply { setPadding(0, 0, g.dp(context, 10f), 0) })
         addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
         addView(haChip())
         addView(profilePill())
@@ -96,23 +138,19 @@ class HomeView(
         text = "HA"; letterSpacing = 0.12f; gravity = Gravity.CENTER
         background = g.tile(context, Glass.BLUE, false, 999f)
         setPadding(g.dp(context, 12f), g.dp(context, 5f), g.dp(context, 12f), g.dp(context, 5f))
-        (layoutParams as? LinearLayout.LayoutParams ?: LinearLayout.LayoutParams(-2, -2)).let {
-            it.leftMargin = g.dp(context, 10f); layoutParams = it
-        }
-        setOnClickListener { haptic(); onHa() }
+        layoutParams = LinearLayout.LayoutParams(-2, -2).apply { leftMargin = g.dp(context, 10f) }
+        tap { onHa() }
     }
 
     private fun profilePill(): View = g.row(context).apply {
         background = g.panel(context, 999f, Color.argb(40, 73, 182, 255))
         setPadding(g.dp(context, 5f), g.dp(context, 4f), g.dp(context, 11f), g.dp(context, 4f))
-        (layoutParams ?: LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)).also {
-            layoutParams = (it as? LinearLayout.LayoutParams ?: LinearLayout.LayoutParams(-2, -2)).apply { leftMargin = g.dp(context, 10f) }
-        }
+        layoutParams = LinearLayout.LayoutParams(-2, -2).apply { leftMargin = g.dp(context, 10f) }
         val initial = (cfg.ownerName.trim().firstOrNull() ?: 'S').uppercaseChar()
         addView(TextView(context).apply {
             text = initial.toString(); textSize = 10f; setTextColor(Color.parseColor("#04101f")); typeface = g.disp(context)
             gravity = Gravity.CENTER
-            background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Glass.BLUE) }
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Glass.BLUE) }
             val s = g.dp(context, 20f); layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 7f) }
         })
         addView(tv(11f, Glass.INK, g.body(context)).apply { text = "ADMIN"; letterSpacing = 0.1f })
@@ -121,59 +159,77 @@ class HomeView(
     private fun hero(): View = g.row(context).apply {
         background = g.panel(context, 20f)
         setPadding(g.dp(context, 16f), g.dp(context, 15f), g.dp(context, 16f), g.dp(context, 15f))
-        val orb = TextView(context).apply {
+        addView(TextView(context).apply {
             text = "◉"; textSize = 26f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Glass.BLUE, Glass.INDIGO)).apply { shape = android.graphics.drawable.GradientDrawable.OVAL }
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Glass.BLUE, Glass.INDIGO)).apply { shape = GradientDrawable.OVAL }
             val s = g.dp(context, 56f); layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 14f) }
-        }
-        addView(orb)
-        addView(g.col(context).apply {
-            addView(greeting); addView(summary)
         })
+        addView(g.col(context).apply { addView(greeting); addView(summary); addView(nowPlaying) },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
     private fun console(): View = g.row(context).apply {
         background = g.panel(context, 28f)
         gravity = Gravity.CENTER
-        setPadding(g.dp(context, 12f), g.dp(context, 12f), g.dp(context, 12f), g.dp(context, 12f))
+        setPadding(g.dp(context, 10f), g.dp(context, 10f), g.dp(context, 10f), g.dp(context, 10f))
         addView(key("HOME", Glass.INK_DIM) { onHome() })
-        addView(g.spacer(context, w = 14))
+        addView(g.spacer(context, w = 10))
+        addView(key("APPS", Glass.BLUE) { onApps() })
+        addView(g.spacer(context, w = 10))
         addView(micOrb())
-        addView(g.spacer(context, w = 14))
+        addView(g.spacer(context, w = 10))
+        addView(key("JARVIS", Glass.VIOLET) { AppCatalog.INTERNAL_APPS.firstOrNull { AppCatalog.key(it) == "jarvis" }?.let(onLaunch) })
+        addView(g.spacer(context, w = 10))
         addView(key("ALL OFF", Glass.RED) { allOff() })
     }
 
     private fun key(text: String, color: Int, onTap: () -> Unit): View = g.col(context).apply {
         gravity = Gravity.CENTER
         background = g.tile(context, color, false, 18f)
-        val s = g.dp(context, 60f); layoutParams = LinearLayout.LayoutParams(s, s)
-        addView(tv(10f, color, g.disp(context)).apply { setText(text); gravity = Gravity.CENTER; letterSpacing = 0.12f })
-        setOnClickListener { haptic(); onTap() }
+        val s = g.dp(context, 54f); layoutParams = LinearLayout.LayoutParams(s, s)
+        addView(tv(9.5f, color, g.disp(context)).apply { setText(text); gravity = Gravity.CENTER; letterSpacing = 0.1f })
+        tap { onTap() }
     }
 
     private fun micOrb(): View = TextView(context).apply {
-        text = "●"; textSize = 30f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-        background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Glass.BLUE, Glass.INDIGO, Color.parseColor("#45227a"))).apply { shape = android.graphics.drawable.GradientDrawable.OVAL }
-        val s = g.dp(context, 86f); layoutParams = LinearLayout.LayoutParams(s, s)
-        setOnClickListener { haptic(); hintLabel.setText("Listening\u2026"); onMic() }
+        text = "●"; textSize = 28f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+        background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Glass.BLUE, Glass.INDIGO, Color.parseColor("#45227a"))).apply { shape = GradientDrawable.OVAL }
+        val s = g.dp(context, 74f); layoutParams = LinearLayout.LayoutParams(s, s)
+        tap { hintLabel.text = "Listening…"; onMic() }
     }
-
-    private fun haptic() = try { performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}
 
     // ---------- live binding ----------
 
     fun refresh() {
         post {
-            greeting.text = greetingText()
             val cache = HaRepository.cache
+            val sig = signature(cache)
+            if (sig == lastSig) return@post
+            lastSig = sig
+            greeting.text = greetingText()
             summary.text = summaryText(cache)
+            bindNowPlaying(cache)
+            bindWeather(cache)
+            buildModes(cache)
             buildRooms(cache)
             buildScenes(cache)
+            buildHouse(cache)
             val cur = hintLabel.text?.toString() ?: ""
-            if (cur.isBlank() || cur.startsWith("Listening")) hintLabel.setText("Tap a room, or hold the mic for Jarvis")
+            if (cur.isBlank() || cur.startsWith("Listening") || cur == "All off") hintLabel.text = "Tap a room, or press the mic for Jarvis"
         }
+    }
+
+    /** Everything the home screen shows, as one string. If it didn't change, skip the rebuild. */
+    private fun signature(cache: EntityCache?): String = buildString {
+        append(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)).append(HaRepository.connected).append(HaRepository.rooms.size)
+        if (cache == null) return@buildString
+        cache.byDomain("light").forEach { append(it.entityId).append(it.state) }
+        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]) }
+        cache.byDomain("scene").forEach { append(it.entityId) }
+        cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
+        modes.forEach { append(cache.get(it.first)?.state) }
+        housePills.forEach { append(cache.get(it.first)?.state) }
     }
 
     private fun greetingText(): String {
@@ -185,7 +241,7 @@ class HomeView(
 
     private fun summaryText(cache: EntityCache?): String {
         if (cache == null || cache.size() == 0) return if (HaRepository.connected) "Connecting…" else "Home Assistant offline"
-        val lightsOn = cache.byDomain("light").count { it.on }
+        val lightsOn = cache.byDomain("light").count { it.on && !it.entityId.endsWith("_listening_light") }
         val media = cache.byDomain("media_player").count { it.state == "playing" }
         return buildString {
             append(if (HaRepository.connected) "Home" else "Offline")
@@ -194,56 +250,157 @@ class HomeView(
         }
     }
 
+    private fun bindNowPlaying(cache: EntityCache?) {
+        val p = cache?.byDomain("media_player")?.firstOrNull { it.state == "playing" }
+        if (p == null) { nowPlaying.visibility = View.GONE; return }
+        val what = (p.attributes["media_title"] as? String)?.takeIf { it.isNotBlank() } ?: (p.attributes["app_name"] as? String) ?: "Playing"
+        nowPlaying.text = "▶  $what  ·  ${p.friendlyName.replace(Regex("(?i)\\s*50 onn roku tv"), " TV")}"
+        nowPlaying.visibility = View.VISIBLE
+    }
+
+    private fun bindWeather(cache: EntityCache?) {
+        val w = cache?.byDomain("weather")?.firstOrNull()
+        if (w == null) { weatherChip.visibility = View.GONE; return }
+        val icon = when (w.state) {
+            "sunny" -> "☀"; "clear-night" -> "☾"; "partlycloudy" -> "⛅"; "cloudy" -> "☁"
+            "rainy", "pouring" -> "☂"; "lightning", "lightning-rainy" -> "⚡"; "snowy", "snowy-rainy" -> "❄"; "fog" -> "≋"
+            "windy", "windy-variant" -> "≈"; else -> "◌"
+        }
+        val t = w.attrDouble("temperature")
+        weatherChip.text = icon + (t?.let { "  ${Math.round(it)}°" } ?: "")
+        weatherChip.visibility = View.VISIBLE
+    }
+
+    private fun buildModes(cache: EntityCache?) {
+        modesRow.removeAllViews()
+        if (cache == null) { modesWrap.visibility = View.GONE; return }
+        val present = modes.filter { cache.get(it.first) != null }
+        modesWrap.visibility = if (present.isEmpty()) View.GONE else View.VISIBLE
+        present.forEach { (id, label, accent) ->
+            val on = cache.get(id)?.state == "on"
+            modesRow.addView(tv(13f, if (on) Glass.INK else Glass.INK_DIM, g.disp(context)).apply {
+                text = (if (on) "● " else "") + label; letterSpacing = 0.05f; gravity = Gravity.CENTER
+                background = g.tile(context, accent, on, 999f)
+                setPadding(g.dp(context, 16f), g.dp(context, 9f), g.dp(context, 16f), g.dp(context, 9f))
+                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { rightMargin = g.dp(context, 8f) }
+                tap { toggleMode(id, on, cache) }
+            })
+        }
+    }
+
+    private fun toggleMode(id: String, on: Boolean, cache: EntityCache) {
+        if (id == "input_boolean.game_mode") {
+            val script = if (on) "script.game_mode_off" else "script.game_mode_on"
+            if (cache.get(script) != null) { HaRepository.callService("script", "turn_on", listOf(script)); return }
+        }
+        HaRepository.toggle(listOf(id), !on)
+    }
+
     private fun buildRooms(cache: EntityCache?) {
         roomsRow.removeAllViews()
         val rooms = if (cache != null) RoomOrder.order(HaRepository.rooms, cfg.room.lowercase().replace(' ', '_'), cache,
             Calendar.getInstance().get(Calendar.HOUR_OF_DAY), cfg.roomOrder) else HaRepository.rooms
         if (activeRoomId == null) activeRoomId = rooms.firstOrNull()?.id
         rooms.forEachIndexed { i, r ->
-            val on = cache != null && (r.lights.any { cache.get(it)?.on == true } || r.media.any { cache.get(it)?.state == "playing" })
-            val card = g.col(context).apply {
+            val on = cache != null && (r.lights.any { cache.get(it)?.on == true && !it.endsWith("_listening_light") } ||
+                r.media.any { cache.get(it)?.state == "playing" })
+            roomsRow.addView(g.col(context).apply {
                 background = g.tile(context, Glass.BLUE, r.id == activeRoomId || on, 16f)
                 setPadding(g.dp(context, 13f), g.dp(context, 11f), g.dp(context, 13f), g.dp(context, 11f))
-                layoutParams = LinearLayout.LayoutParams(g.dp(context, 104f), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                layoutParams = LinearLayout.LayoutParams(g.dp(context, 108f), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     rightMargin = g.dp(context, 9f)
                 }
                 addView(tv(11f, Glass.BLUE, g.disp(context)).apply { text = "CH ${i + 1}"; letterSpacing = 0.1f })
-                addView(tv(14f, Glass.INK, g.body(context)).apply { text = r.name; setTypeface(typeface, Typeface.BOLD) })
+                addView(tv(14f, Glass.INK, g.body(context)).apply { text = r.name; setTypeface(typeface, Typeface.BOLD); maxLines = 1 })
                 addView(tv(10.5f, Glass.INK_FAINT, g.body(context)).apply { text = roomSub(r, cache) })
-                setOnClickListener { haptic(); activeRoomId = r.id; onOpenRoom(r); refresh() }
-            }
-            roomsRow.addView(card)
+                tap { activeRoomId = r.id; onOpenRoom(r) }
+            })
         }
+        if (rooms.isEmpty()) roomsRow.addView(tv(12f, Glass.INK_FAINT, g.body(context)).apply {
+            text = if (HaRepository.connected) "Loading rooms from Home Assistant…" else "Waiting for Home Assistant…"
+        })
     }
 
     private fun roomSub(r: Room, cache: EntityCache?): String {
         if (cache == null) return "${r.lights.size} lights"
-        val on = r.lights.count { cache.get(it)?.on == true }
+        val on = r.lights.count { cache.get(it)?.on == true && !it.endsWith("_listening_light") }
         val tv = r.media.any { cache.get(it)?.state == "playing" }
         return when { on > 0 && tv -> "$on on · TV"; on > 0 -> "$on on"; tv -> "TV"; else -> "all off" }
     }
 
     private fun buildScenes(cache: EntityCache?) {
         scenesWrap.removeAllViews()
-        val scenes = cache?.byDomain("scene")?.take(6) ?: emptyList()
+        val scenes = cache?.byDomain("scene")?.take(8) ?: emptyList()
         val accents = intArrayOf(Glass.AMBER, Glass.VIOLET, Glass.BLUE, Glass.MINT, Glass.INDIGO, Glass.RED)
         var rowView: LinearLayout? = null
         scenes.forEachIndexed { i, s ->
-            if (i % 2 == 0) { rowView = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-                scenesWrap.addView(rowView); if (i > 0) {} }
+            if (i % 2 == 0) { rowView = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }; scenesWrap.addView(rowView) }
             val accent = accents[i % accents.size]
             val pad = g.col(context).apply {
                 background = g.tile(context, accent, false, 15f)
-                setPadding(g.dp(context, 14f), g.dp(context, 13f), g.dp(context, 14f), g.dp(context, 13f))
-                layoutParams = LinearLayout.LayoutParams(0, g.dp(context, 64f), 1f).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(g.dp(context, 14f), g.dp(context, 10f), g.dp(context, 14f), g.dp(context, 10f))
+                layoutParams = LinearLayout.LayoutParams(0, g.dp(context, 56f), 1f).apply {
                     if (i % 2 == 1) leftMargin = g.dp(context, 9f); topMargin = g.dp(context, 9f)
                 }
-                addView(tv(16f, Glass.INK, g.disp(context)).apply { text = s.friendlyName })
-                setOnClickListener { haptic(); HaRepository.callService("scene", "turn_on", listOf(s.entityId)); flash(this, accent) }
+                addView(tv(15f, Glass.INK, g.disp(context)).apply { text = s.friendlyName; maxLines = 1 })
             }
+            pad.tap { HaRepository.callService("scene", "turn_on", listOf(s.entityId)); flash(pad, accent) }
             rowView?.addView(pad)
         }
+        if (scenes.size % 2 == 1) rowView?.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f).apply { leftMargin = g.dp(context, 9f) })
         if (scenes.isEmpty()) scenesWrap.addView(tv(12f, Glass.INK_FAINT, g.body(context)).apply { text = "No scenes in Home Assistant yet" })
+    }
+
+    private fun buildHouse(cache: EntityCache?) {
+        houseWrap.removeAllViews()
+        val pills = housePills.mapNotNull { (id, label) -> cache?.get(id)?.let { it to label } }
+        if (pills.isEmpty()) {
+            houseWrap.addView(tv(12f, Glass.INK_FAINT, g.body(context)).apply { text = "Open Sensors to see everything the house knows" })
+            return
+        }
+        var row: LinearLayout? = null
+        pills.forEachIndexed { i, (e, label) ->
+            if (i % 3 == 0) { row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }; houseWrap.addView(row) }
+            val (word, good) = houseWord(e)
+            val accent = if (good) Glass.MINT else Glass.RED
+            row?.addView(g.col(context).apply {
+                background = g.tile(context, accent, true, 14f)
+                setPadding(g.dp(context, 11f), g.dp(context, 8f), g.dp(context, 11f), g.dp(context, 8f))
+                addView(tv(10.5f, Glass.INK_DIM, g.body(context)).apply { text = label; maxLines = 1 })
+                addView(tv(13f, accent, g.disp(context)).apply { text = word })
+                tap { onSensors() }
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                if (i % 3 != 0) leftMargin = g.dp(context, 8f); topMargin = g.dp(context, 8f)
+            })
+        }
+        val rem = pills.size % 3
+        if (rem != 0) repeat(3 - rem) { row?.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f).apply { leftMargin = g.dp(context, 8f) }) }
+    }
+
+    /** (word, isGood) for a house status pill. */
+    private fun houseWord(e: Entity): Pair<String, Boolean> {
+        val on = e.state == "on"
+        if (e.state == "unavailable" || e.state == "unknown") return "—" to false
+        return when (e.attributes["device_class"] as? String) {
+            "connectivity" -> (if (on) "Online" else "Offline") to on
+            "presence" -> (if (on) "Yes" else "No") to true
+            "problem" -> (if (on) "Problem" else "OK") to !on
+            else -> (if (on) "On" else "Off") to true
+        }
+    }
+
+    private fun buildDock() {
+        dockWrap.removeAllViews()
+        val apps = AppCatalog.dock(context)
+        var row: LinearLayout? = null
+        apps.forEachIndexed { i, a ->
+            if (i % 3 == 0) { row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }; dockWrap.addView(row) }
+            row?.addView(AppDrawerView.appCell(context, a, 54f) { onLaunch(a) },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { bottomMargin = g.dp(context, 14f) })
+        }
+        val rem = apps.size % 3
+        if (rem != 0) repeat(3 - rem) { row?.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f)) }
     }
 
     private fun flash(v: View, accent: Int) {
@@ -252,10 +409,9 @@ class HomeView(
     }
 
     private fun allOff() {
-        hintLabel.setText("All off")
+        hintLabel.text = "All off"
         val cache = HaRepository.cache ?: return
-        val lights = cache.byDomain("light").filter { it.on }.map { it.entityId }
+        val lights = cache.byDomain("light").filter { it.on && !it.entityId.endsWith("_listening_light") }.map { it.entityId }
         if (lights.isNotEmpty()) HaRepository.callService("light", "turn_off", lights)
-        postDelayed({ refresh() }, 600)
     }
 }
