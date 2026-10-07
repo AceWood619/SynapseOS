@@ -22,7 +22,8 @@ object ConfigStore {
         return try { NodeConfig.fromJson(s) } catch (e: Exception) { null }
     }
 
-    /** Returns true if a new config was imported. */
+    /** Returns true if a new config was imported. Synchronized: the service and the screen both poll for the file. */
+    @Synchronized
     fun importIfPresent(ctx: Context): Boolean {
         val dir = ctx.getExternalFilesDir(null) ?: return false
         val f = File(dir, "config.json")

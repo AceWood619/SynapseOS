@@ -31,7 +31,7 @@ class ControlServer(private val port: Int, private val router: ApiRouter) {
                         c.use { sock ->
                             sock.soTimeout = 5_000
                             val resp = try {
-                                router.handle(HttpParser.read(sock.getInputStream()))
+                                router.handle(HttpParser.read(sock.getInputStream().buffered()))
                             } catch (e: HttpParser.BadRequest) {
                                 HttpResponse.error(e.status, e.message ?: "bad request")
                             } catch (e: Exception) {
