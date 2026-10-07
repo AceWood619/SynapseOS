@@ -259,3 +259,53 @@ class BleTest {
         assertEquals(1, NodeConfig.fromJson("""{"node_id":"n","ha_url":"http://h","ha_token":"abcdefghijklmnopqrstuvwxyz0123","camera":"side"}""").validate().size)
     }
 }
+
+class HaWsTest {
+    @Test fun buildsMessages() {
+        assertEquals("""{"type":"auth","access_token":"abc"}""", HaWs.authMessage("abc"))
+        assertEquals("""{"id":1,"type":"subscribe_events","event_type":"state_changed"}""", HaWs.subscribeStatesMessage(1))
+        assertEquals("""{"id":2,"type":"get_states"}""", HaWs.getStatesMessage(2))
+        val call = Json.parseObject(HaWs.callServiceMessage(5, "light", "turn_on", mapOf("brightness" to 200.0), mapOf("entity_id" to "light.kitchen")))
+        assertEquals("light", call["domain"]); assertEquals("turn_on", call["service"])
+        assertEquals("light.kitchen", ((call["target"] as Map<*,*>)["entity_id"]))
+    }
+    @Test fun parsesAuthHandshake() {
+        assertTrue(HaWs.parse("""{"type":"auth_required","ha_version":"2026.10"}""") is HaWs.Frame.AuthRequired)
+        assertTrue(HaWs.parse("""{"type":"auth_ok","ha_version":"2026.10"}""") is HaWs.Frame.AuthOk)
+        val inv = HaWs.parse("""{"type":"auth_invalid","message":"bad token"}""")
+        assertTrue(inv is HaWs.Frame.AuthInvalid && inv.message == "bad token")
+    }
+    @Test fun parsesGetStatesResultAndEvents() {
+        val result = """{"id":2,"type":"result","success":true,"result":[
+            {"entity_id":"light.kitchen","state":"on","attributes":{"friendly_name":"Kitchen","brightness":180}},
+            {"entity_id":"sensor.temp","state":"72.5","attributes":{"unit_of_measurement":"°F"}}]}"""
+        val f = HaWs.parse(result)
+        assertTrue(f is HaWs.Frame.Result)
+        val states = (f as HaWs.Frame.Result).states!!
+        assertEquals(2, states.size)
+        assertEquals("Kitchen", states[0].friendlyName); assertTrue(states[0].on); assertEquals("light", states[0].domain)
+
+        val evt = """{"type":"event","event":{"event_type":"state_changed","data":{"entity_id":"light.kitchen",
+            "new_state":{"entity_id":"light.kitchen","state":"off","attributes":{"friendly_name":"Kitchen"}}}}}"""
+        val e = HaWs.parse(evt)
+        assertTrue(e is HaWs.Frame.StateChanged)
+        assertEquals("off", (e as HaWs.Frame.StateChanged).entity!!.state)
+        assertTrue(HaWs.parse("""{"type":"pong","id":9}""") is HaWs.Frame.Pong)
+    }
+    @Test fun entityCacheAppliesAndQueries() {
+        val c = EntityCache()
+        val r = HaWs.parse("""{"id":2,"type":"result","success":true,"result":[
+            {"entity_id":"light.kitchen","state":"on","attributes":{}},
+            {"entity_id":"light.lamp","state":"off","attributes":{}},
+            {"entity_id":"sensor.temp","state":"72","attributes":{}}]}""") as HaWs.Frame.Result
+        c.applyStates(r.states!!)
+        assertEquals(3, c.size())
+        assertEquals(2, c.byDomain("light").size)
+        assertEquals("on", c.get("light.kitchen")!!.state)
+        val e = HaWs.parse("""{"type":"event","event":{"event_type":"state_changed","data":{"new_state":
+            {"entity_id":"light.kitchen","state":"off","attributes":{}}}}}""") as HaWs.Frame.StateChanged
+        c.applyStateChanged(e.entity)
+        assertEquals("off", c.get("light.kitchen")!!.state)
+        assertFalse(c.get("light.kitchen")!!.on)
+    }
+}
