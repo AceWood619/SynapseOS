@@ -1,5 +1,6 @@
 package com.acewood.synapse.core
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -19,6 +20,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -46,6 +48,9 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var root: FrameLayout
     private var webCrashes = 0
+    private lateinit var splash: LinearLayout
+    private var brightnessAnim: ValueAnimator? = null
+    private var pageReady = false
     private lateinit var ambient: LinearLayout
     private lateinit var ambientStatus: TextView
     private lateinit var setup: TextView
@@ -66,6 +71,37 @@ class MainActivity : Activity() {
     }
 
     private fun now() = SystemClock.elapsedRealtime()
+
+    /** Branded loading screen shown over the WebView until the dashboard finishes painting. */
+    private fun buildSplash(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setBackgroundColor(Color.rgb(8, 10, 18))
+        addView(TextView(context).apply {
+            text = "SYNAPSE"
+            textSize = 34f; setTextColor(Color.rgb(120, 170, 255))
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            letterSpacing = 0.34f; gravity = Gravity.CENTER
+        })
+        addView(TextView(context).apply {
+            text = "connecting\u2026"
+            textSize = 13f; setTextColor(Color.rgb(90, 96, 115))
+            letterSpacing = 0.18f; gravity = Gravity.CENTER; setPadding(0, dp(14), 0, 0)
+        })
+    }
+
+    private fun showSplash(label: String) {
+        pageReady = false
+        (splash.getChildAt(1) as? TextView)?.text = label
+        splash.animate().cancel()
+        splash.alpha = 1f
+        splash.visibility = View.VISIBLE
+    }
+
+    private fun hideSplash() {
+        if (splash.visibility != View.VISIBLE) return
+        splash.animate().alpha(0f).setDuration(450).withEndAction { splash.visibility = View.GONE }.start()
+    }
 
     companion object {
         /** Process-wide: companions are opened once per boot (or app restart), not on every resume. */
@@ -89,28 +125,39 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setBackgroundColor(Color.BLACK)
             visibility = View.GONE
+            alpha = 0f
             addView(TextClock(context).apply {
                 format12Hour = "h:mm"; format24Hour = "H:mm"
-                textSize = 96f; setTextColor(Color.rgb(170, 170, 170)); typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-                gravity = Gravity.CENTER
+                textSize = 100f; setTextColor(Color.rgb(180, 185, 200))
+                typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+                letterSpacing = -0.02f; gravity = Gravity.CENTER
             })
             addView(TextClock(context).apply {
                 format12Hour = "EEEE, MMMM d"; format24Hour = "EEEE, d MMMM"
-                textSize = 22f; setTextColor(Color.rgb(120, 120, 120)); gravity = Gravity.CENTER
+                textSize = 22f; setTextColor(Color.rgb(110, 115, 130))
+                typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+                gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0)
             })
             ambientStatus = TextView(context).apply {
-                textSize = 14f; setTextColor(Color.rgb(90, 90, 90)); gravity = Gravity.CENTER
-                setPadding(0, dp(24), 0, 0)
+                textSize = 15f; setTextColor(Color.rgb(90, 140, 110)); gravity = Gravity.CENTER
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                letterSpacing = 0.08f; setPadding(0, dp(28), 0, 0)
             }
             addView(ambientStatus)
         }
         root.addView(ambient, FrameLayout.LayoutParams(-1, -1))
 
         setup = TextView(this).apply {
-            setTextColor(Color.WHITE); textSize = 18f; setPadding(dp(24), dp(48), dp(24), dp(24))
-            setBackgroundColor(Color.rgb(15, 15, 25)); visibility = View.GONE
+            setTextColor(Color.rgb(210, 214, 228)); textSize = 16f
+            setPadding(dp(28), dp(64), dp(28), dp(28))
+            gravity = Gravity.CENTER_HORIZONTAL
+            typeface = Typeface.MONOSPACE
+            setBackgroundColor(Color.rgb(10, 12, 20)); visibility = View.GONE
         }
         root.addView(setup, FrameLayout.LayoutParams(-1, -1))
+
+        splash = buildSplash()
+        root.addView(splash, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
 
         startForegroundService(Intent(this, NodeService::class.java))
@@ -208,8 +255,9 @@ class MainActivity : Activity() {
             if (idle.tick(now())) applyMode()
             // Burn-in protection: nudge the clock a little every minute.
             if (tickCount % 60 == 0L && ambient.visibility == View.VISIBLE) {
-                ambient.translationX = Random.nextInt(-dp(30), dp(30)).toFloat()
-                ambient.translationY = Random.nextInt(-dp(40), dp(40)).toFloat()
+                ambient.animate().translationX(Random.nextInt(-dp(30), dp(30)).toFloat())
+                    .translationY(Random.nextInt(-dp(40), dp(40)).toFloat())
+                    .setDuration(2_000).setInterpolator(DecelerateInterpolator()).start()
             }
             if (cfg == null && tickCount % 10 == 0L && ConfigStore.importIfPresent(this@MainActivity)) {
                 NodeBus.send(NodeBus.Command.CONFIG_CHANGED)
@@ -220,14 +268,41 @@ class MainActivity : Activity() {
 
     private fun applyMode() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
-        ambient.visibility = if (amb) View.VISIBLE else View.GONE
-        val lp = window.attributes
-        lp.screenBrightness = if (amb) (cfg?.ambientBrightness ?: 0.02f) else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-        window.attributes = lp
         NodeBus.screenMode = if (amb) "ambient" else "active"
         if (amb) {
-            val c = cfg
-            ambientStatus.text = if (c == null) "" else "● ${c.room}"
+            ambientStatus.text = cfg?.let { "● ${it.room.uppercase()}" } ?: ""
+            ambient.visibility = View.VISIBLE
+            ambient.animate().alpha(1f).setDuration(500).setInterpolator(DecelerateInterpolator()).start()
+            rampBrightness(cfg?.ambientBrightness ?: 0.02f, clearAfter = false, durationMs = 700)
+        } else {
+            ambient.animate().alpha(0f).setDuration(350).withEndAction {
+                if (idle.mode != IdleController.Mode.AMBIENT) ambient.visibility = View.GONE
+            }.start()
+            ambient.translationX = 0f; ambient.translationY = 0f
+            rampBrightness(1f, clearAfter = true, durationMs = 300)
+        }
+    }
+
+    /** Smoothly ramp the panel brightness instead of snapping. clearAfter hands control back to the system. */
+    private fun rampBrightness(target: Float, clearAfter: Boolean, durationMs: Long) {
+        brightnessAnim?.cancel()
+        val lp = window.attributes
+        val from = if (lp.screenBrightness in 0f..1f) lp.screenBrightness else 1f
+        brightnessAnim = ValueAnimator.ofFloat(from, target).apply {
+            duration = durationMs
+            addUpdateListener {
+                val a = window.attributes
+                a.screenBrightness = it.animatedValue as Float
+                window.attributes = a
+            }
+            if (clearAfter) addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    val a = window.attributes
+                    a.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    window.attributes = a
+                }
+            })
+            start()
         }
     }
 
@@ -267,13 +342,15 @@ class MainActivity : Activity() {
         cfg = c
         if (c == null) {
             setup.visibility = View.VISIBLE
-            setup.text = "Synapse node — not configured yet\n\n" +
-                "Push a config file to:\n/sdcard/Android/data/$packageName/files/config.json\n\n" +
-                "(tools/provision/provision.py in the SynapseOS repo does this.)\n\n" +
-                "This screen checks for it every 10 seconds."
+            hideSplash()
+            setup.text = "S Y N A P S E\n\n" +
+                "node ready — not configured\n\n" +
+                "run  tools/provision/provision.py\nfrom the SynapseOS repo on your PC\n\n" +
+                "checking for config every 10s…"
             return
         }
         setup.visibility = View.GONE
+        showSplash("connecting to ${origin(c.haUrl)?.removePrefix("http://")?.removePrefix("https://") ?: "Home Assistant"}…")
         idle.idleMs = c.idleSeconds * 1000L
         val url = c.dashboardUrl + (if (c.dashboardUrl.contains('?')) "&" else "?") + "external_auth=1"
         web.loadUrl(url)
@@ -299,6 +376,13 @@ class MainActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 pageOrigin = origin(url)
+            }
+            override fun onPageFinished(view: WebView, url: String?) {
+                // Give HA's SPA a moment to paint the dashboard, then fade the splash out.
+                if (!pageReady && origin(url) == origin(cfg?.haUrl)) {
+                    pageReady = true
+                    ui.postDelayed({ hideSplash() }, 700)
+                }
             }
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
