@@ -98,6 +98,8 @@ def main():
     ap.add_argument("--extra-apk", action="append", default=[], help="other APKs to install (SherpaTTS, HA Companion minimal…)")
     ap.add_argument("--device-owner", action="store_true", help="make Synapse the device owner (kiosk lockdown)")
     ap.add_argument("--no-kiosk", action="store_true", help="don't lock the screen to Synapse")
+    ap.add_argument("--companion", action="append", default=[],
+                    help="package allowed through kiosk + opened once after boot (e.g. com.example.ava for Ava voice)")
     a = ap.parse_args()
 
     token = os.environ.get("SYNAPSE_HA_TOKEN", "").strip()
@@ -147,6 +149,14 @@ def main():
     # 4. battery-optimization exemption + notifications
     adb.sh(f"dumpsys deviceidle whitelist +{PKG}")
     step("doze exemption", PKG in adb.sh("dumpsys deviceidle whitelist"))
+    for comp in a.companion:
+        if comp not in adb.sh(f"pm list packages {comp}"):
+            step(f"companion {comp} installed", False, "install it first (e.g. --extra-apk Ava.apk)")
+            continue
+        adb.sh(f"dumpsys deviceidle whitelist +{comp}")
+        adb.sh(f"pm grant {comp} android.permission.RECORD_AUDIO")
+        adb.sh(f"pm grant {comp} android.permission.POST_NOTIFICATIONS")
+        step(f"companion {comp} ready", comp in adb.sh("dumpsys deviceidle whitelist"))
     adb.sh(f"pm grant {PKG} android.permission.POST_NOTIFICATIONS")
 
     # 5. start the app once so it creates its external files dir, then push config
@@ -156,6 +166,7 @@ def main():
         "node_id": a.node_id, "room": a.room, "ha_url": a.ha_url.rstrip("/"), "ha_token": token,
         "dashboard_path": a.dashboard_path, "idle_seconds": a.idle_seconds, "pin": sec["pin"],
         "api_port": 8765, "api_key": sec["api_key"], "kiosk": not a.no_kiosk,
+        "companion_apps": a.companion,
     }
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
         json.dump(cfg, tf)

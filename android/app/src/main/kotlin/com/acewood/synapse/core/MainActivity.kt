@@ -63,6 +63,11 @@ class MainActivity : Activity() {
     }
 
     private fun now() = SystemClock.elapsedRealtime()
+
+    companion object {
+        /** Process-wide: companions are opened once per boot (or app restart), not on every resume. */
+        @Volatile private var companionsLaunched = false
+    }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,6 +131,31 @@ class MainActivity : Activity() {
         if (cfg?.kiosk != false) Kiosk.enterLockTask(this)
         idle.activity(now())
         applyMode()
+        launchCompanionsOnce()
+    }
+
+    /**
+     * Companion apps (e.g. Ava, the voice satellite) need to be opened once after boot so their
+     * services start: Android 14 only lets a microphone service start from a visible screen.
+     * Open each one for a few seconds, then bring the dashboard back. Once per app process.
+     */
+    private fun launchCompanionsOnce() {
+        val apps = cfg?.companionApps.orEmpty()
+        if (companionsLaunched || apps.isEmpty()) return
+        companionsLaunched = true
+        var delay = 3_000L
+        for (pkg in apps) {
+            val intent = packageManager.getLaunchIntentForPackage(pkg) ?: continue
+            ui.postDelayed({
+                try { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) {
+                    android.util.Log.w(SynapseApp.TAG, "can't open companion $pkg", e)
+                }
+            }, delay)
+            delay += 6_000L
+        }
+        ui.postDelayed({
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        }, delay)
     }
 
     override fun onPause() {

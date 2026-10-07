@@ -48,6 +48,14 @@ class NodeConfigTest {
         val errs = c.validate()
         assertEquals(5, errs.size, errs.toString())
     }
+    @Test fun companionApps() {
+        val c = NodeConfig.fromJson(good.replace("}", ",\"companion_apps\":[\"com.example.ava\",\" com.example.ava \",\"\"]}"))
+        assertEquals(listOf("com.example.ava"), c.companionApps)
+        assertTrue(c.validate().isEmpty())
+        assertEquals(c, NodeConfig.fromJson(c.toJson()))
+        val bad = NodeConfig.fromJson(good.replace("}", ",\"companion_apps\":[\"not a package\"]}"))
+        assertEquals(1, bad.validate().size)
+    }
     @Test fun redactedHidesSecrets() {
         val r = NodeConfig.fromJson(good).redacted().toString()
         assertFalse(r.contains("abcdefghijklmnop"))

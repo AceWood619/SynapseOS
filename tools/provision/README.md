@@ -14,6 +14,15 @@ Runs on the PC (HANDS). Takes a phone that's running SynapseOS and turns it into
 4. Read the PASS/FAIL summary. Then check by eye: the dashboard shows, dims to a clock after `--idle-seconds` (default 120), and wakes on touch or a hand over the top of the phone.
 5. Optional behaviour test: `python tools\provision\smoke_test.py --node-id livingroom-01 --ip 10.0.0.166 --ha-url http://homeassistant.local:8123 --speak`
 
+## Voice (Ava)
+Ava (github.com/brownard/Ava, Apache-2.0) turns the phone into an **ESPHome voice satellite**. HA's ESPHome integration auto-discovers it on port 6053.
+1. Download the latest Ava APK from its GitHub releases (v0.6.2 at time of writing). Its package is `com.example.ava`.
+2. `provision.py … --extra-apk Ava.apk --companion com.example.ava`
+3. Open Ava once by hand: turn on **Autostart service**, then start the service. After every boot, Synapse opens Ava for a few seconds so the mic service can start (Android 14 rule), then returns to the dashboard.
+4. In HA: Settings → Devices → ESPHome → the discovered satellite → finish the Assist wizard.
+
+⚠️ Ava's port 6053 has no authentication (the ESPHome API as server). Keep the phone on a trusted LAN or VLAN.
+
 ## What it sets up
 | Thing | Where |
 |---|---|

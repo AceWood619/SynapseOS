@@ -26,7 +26,8 @@ object Kiosk {
         val dpm = ctx.getSystemService(DevicePolicyManager::class.java)
         val a = admin(ctx)
         try {
-            dpm.setLockTaskPackages(a, arrayOf(ctx.packageName))
+            val companions = ConfigStore.load(ctx)?.companionApps.orEmpty()
+            dpm.setLockTaskPackages(a, (listOf(ctx.packageName) + companions).distinct().toTypedArray())
             // Keep the power menu so the phone can still be shut down by hand.
             dpm.setLockTaskFeatures(a, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
             val home = IntentFilter(Intent.ACTION_MAIN).apply {
