@@ -179,12 +179,13 @@ class RoomPadView(
                 addView(roundKey("⏭") { send(MediaRemote.next(t.entityId)) })
             })
         }
-        if (t.volumePct != null) {
+        val vol = t.volumePct
+        if (vol != null) {
             addView(g.spacer(context, h = 10))
             addView(g.row(context).apply {
                 addView(tv(11f, Glass.INK_FAINT, g.disp(context)).apply { text = "VOL" })
                 addView(g.spacer(context, w = 10))
-                addView(slider(t.volumePct, 100, Glass.MINT) { pct ->
+                addView(slider(vol, 100, Glass.MINT) { pct ->
                     HaRepository.callService("media_player", "volume_set", listOf(t.entityId), mapOf("volume_level" to pct / 100.0))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             })
@@ -232,10 +233,11 @@ class RoomPadView(
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         })
-        if (t.targetTemp != null) {
+        val target = t.targetTemp
+        if (target != null) {
             addView(g.spacer(context, h = 8))
             val span = (t.maxTemp - t.minTemp).coerceAtLeast(1.0)
-            val cur = (((t.targetTemp - t.minTemp) / span) * 100).roundToInt().coerceIn(0, 100)
+            val cur = (((target - t.minTemp) / span) * 100).roundToInt().coerceIn(0, 100)
             addView(slider(cur, 100, Glass.RED) { pct ->
                 val temp = t.minTemp + (pct / 100.0) * span
                 val stepped = (Math.round(temp / t.step) * t.step)
@@ -276,9 +278,10 @@ class RoomPadView(
             addView(roundKey("■") { HaRepository.callService("cover", "stop_cover", listOf(t.entityId)); refresh() }); addView(g.spacer(context, w = 7))
             addView(roundKey("▼") { HaRepository.callService("cover", "close_cover", listOf(t.entityId)); refresh() })
         })
-        if (t.supportsPosition && t.positionPct != null) {
+        val pos = t.positionPct
+        if (t.supportsPosition && pos != null) {
             addView(g.spacer(context, h = 10))
-            addView(slider(t.positionPct, 100, Glass.BLUE) { pct ->
+            addView(slider(pos, 100, Glass.BLUE) { pct ->
                 HaRepository.callService("cover", "set_cover_position", listOf(t.entityId), mapOf("position" to pct))
             })
         }
