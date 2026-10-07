@@ -20,6 +20,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -43,6 +44,8 @@ import kotlin.random.Random
 class MainActivity : Activity() {
     private val ui = Handler(Looper.getMainLooper())
     private lateinit var web: WebView
+    private lateinit var root: FrameLayout
+    private var webCrashes = 0
     private lateinit var ambient: LinearLayout
     private lateinit var ambientStatus: TextView
     private lateinit var setup: TextView
@@ -76,10 +79,10 @@ class MainActivity : Activity() {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
 
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         web = WebView(this)
         setupWebView()
-        root.addView(web, FrameLayout.LayoutParams(-1, -1))
+        root.addView(web, 0, FrameLayout.LayoutParams(-1, -1))
 
         ambient = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -301,8 +304,25 @@ class MainActivity : Activity() {
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) scheduleRetry()
             }
+            /** Without this, a crash of WebView's renderer (likely on a 3 GB phone) kills the whole app. */
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                webCrashes++
+                android.util.Log.w(SynapseApp.TAG, "WebView renderer gone (crash=${detail.didCrash()}), rebuilding #$webCrashes")
+                ui.post { rebuildWebView() }
+                return true
+            }
         }
         web.addJavascriptInterface(HaBridge(), "externalApp")
+    }
+
+    private fun rebuildWebView() {
+        val old = web
+        root.removeView(old)
+        try { old.destroy() } catch (_: Exception) {}
+        web = WebView(this)
+        setupWebView()
+        root.addView(web, 0, FrameLayout.LayoutParams(-1, -1))
+        loadConfigAndPage()
     }
 
     private fun scheduleRetry() {
