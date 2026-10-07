@@ -827,3 +827,16 @@ class ProfileAdminTest {
         assertFalse(next.toJson().contains("2468"))
     }
 }
+
+class TimersTest {
+    @Test fun extractsActiveAndPausedTimersWithRemainingTime() {
+        val cache = EntityCache().apply { applyStates(listOf(
+            Entity("timer.dinner", "active", mapOf("friendly_name" to "Dinner", "remaining" to "00:10:00")),
+            Entity("timer.laundry", "paused", mapOf("friendly_name" to "Laundry", "duration" to "00:30:00")),
+        )) }
+        val timers = Timers.snapshot(cache)
+        assertEquals(listOf("Dinner", "Laundry"), timers.map { it.name })
+        assertTrue(timers[0].isActive); assertTrue(timers[1].isPaused)
+        assertEquals("00:30:00", timers[1].remaining)
+    }
+}

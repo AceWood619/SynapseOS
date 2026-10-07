@@ -74,6 +74,7 @@ class HomeView(
     private val summary = tv(12.5f, Glass.INK_DIM, g.light(context))
     private val nowPlaying = tv(12f, Glass.MINT, g.body(context)).apply { maxLines = 1; visibility = View.GONE }
     private val nowPlayingCard = g.col(context).apply { visibility = View.GONE }
+    private val timerCard = TimerCardView(context)
     private val weatherChip = tv(12f, Glass.AMBER, g.disp(context)).apply { visibility = View.GONE }
     private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val modesWrap = g.col(context)
@@ -115,6 +116,8 @@ class HomeView(
         col.addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(body) },
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         body.addView(hero())
+        body.addView(g.spacer(context, h = 12))
+        body.addView(timerCard)
         body.addView(g.spacer(context, h = 12))
         modesWrap.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(modesRow) })
         modesWrap.addView(g.spacer(context, h = 12))
@@ -241,6 +244,7 @@ class HomeView(
             greeting.text = greetingText()
             summary.text = summaryText(cache)
             bindNowPlaying(cache)
+            timerCard.refresh(cache)
             bindWeather(cache)
             buildModes(cache)
             buildRooms(cache)
@@ -259,6 +263,7 @@ class HomeView(
         cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]).append(it.attributes["entity_picture"]).append(it.attributes["volume_level"]) }
         cache.byDomain("scene").forEach { append(it.entityId) }
         cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
+        cache.byDomain("timer").forEach { append(it.entityId).append(it.state).append(it.attributes["remaining"]).append(it.attributes["duration"]) }
         modes.forEach { append(cache.get(it.first)?.state) }
         housePills.forEach { append(cache.get(it.first)?.state) }
     }
