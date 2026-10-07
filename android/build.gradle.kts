@@ -1,3 +1,1 @@
-plugins {
-    kotlin("jvm") version "2.0.21" apply false
-}
+// Plugin versions are declared in settings.gradle.kts (pluginManagement).

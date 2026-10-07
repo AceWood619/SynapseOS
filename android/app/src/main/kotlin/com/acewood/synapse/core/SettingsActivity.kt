@@ -44,6 +44,13 @@ class SettingsActivity : Activity() {
             try { stopLockTask() } catch (_: Exception) {}
             startActivity(Intent(Settings.ACTION_SETTINGS))
         }
+        button("Remove device owner (undo kiosk lockdown)") {
+            if (Kiosk.isDeviceOwner(this)) {
+                Kiosk.relax(this)
+                try { stopLockTask() } catch (_: Exception) {}
+                getSystemService(android.app.admin.DevicePolicyManager::class.java).clearDeviceOwnerApp(packageName)
+            }
+        }
         setContentView(ScrollView(this).apply { addView(col) })
         refresh()
     }

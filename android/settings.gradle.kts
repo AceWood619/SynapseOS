@@ -9,6 +9,12 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    // Versions live here (not in the root build) so each module loads its plugins in one classloader.
+    plugins {
+        kotlin("jvm") version "2.0.21"
+        kotlin("android") version "2.0.21"
+        id("com.android.application") version "8.7.3"
+    }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
