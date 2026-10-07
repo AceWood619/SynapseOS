@@ -676,3 +676,40 @@ class RoomControlExpandedTest {
         assertEquals(listOf("Front Door"), rooms.map { it.name })   // no longer dropped for lacking lights/media
     }
 }
+
+class ResilientPairingByNameTest {
+    @Test fun pairsMultiByFriendlyName() {
+        // master-bedroom-like: 3 local (numeric ids) + 2 cloud; names reveal the twins
+        val lights = listOf(
+            "light.cync_lan_694243630_22", "light.cync_lan_694243630_185", "light.cync_lan_694243630_245",
+            "light.zz_cloud_bedroom_led_strip", "light.zz_cloud_mb_lamp_top")
+        val names = mapOf(
+            "light.cync_lan_694243630_22" to "Bedroom LED Strip",
+            "light.cync_lan_694243630_185" to "MB Lamp Top",
+            "light.cync_lan_694243630_245" to "Nightstand",
+            "light.zz_cloud_bedroom_led_strip" to "Bedroom LED Strip",
+            "light.zz_cloud_mb_lamp_top" to "MB Lamp Top")
+        val (pairs, ambiguous) = ResilientLight.pairRoomLights(lights) { names[it] }
+        val strip = pairs.first { it.name.contains("Strip", true) }
+        assertEquals("light.cync_lan_694243630_22", strip.local)
+        assertEquals("light.zz_cloud_bedroom_led_strip", strip.cloud)
+        val lamp = pairs.first { it.name.contains("Lamp", true) }
+        assertEquals("light.cync_lan_694243630_185", lamp.local)
+        assertEquals("light.zz_cloud_mb_lamp_top", lamp.cloud)
+        // the third local (Nightstand) has no cloud twin → stays local-only, not mis-paired
+        val ns = pairs.first { it.name.contains("Nightstand", true) }
+        assertEquals("light.cync_lan_694243630_245", ns.local); assertNull(ns.cloud)
+        assertFalse(ambiguous)   // every cloud matched a local
+    }
+    @Test fun withoutNamesFallsBackToSinglesAndFlags() {
+        val lights = listOf("light.cync_lan_1", "light.cync_lan_2", "light.zz_cloud_strip", "light.zz_cloud_lamp")
+        val (pairs, ambiguous) = ResilientLight.pairRoomLights(lights)   // no name resolver
+        assertEquals(4, pairs.size)      // nothing mis-paired
+        assertTrue(ambiguous)            // flagged for mapping
+    }
+    @Test fun stillPairsOneLocalOneCloud() {
+        val (pairs, ambiguous) = ResilientLight.pairRoomLights(listOf("light.cync_lan_9", "light.zz_cloud_hallway"))
+        assertEquals(1, pairs.size); assertFalse(ambiguous)
+        assertEquals("light.cync_lan_9", pairs[0].local); assertEquals("light.zz_cloud_hallway", pairs[0].cloud)
+    }
+}

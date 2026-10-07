@@ -73,7 +73,7 @@ object RoomControl {
     private const val FEAT_PLAY = 16384
 
     fun build(room: Room, cache: EntityCache): Model {
-        val (paired, ambiguous) = ResilientLight.pairRoomLights(room.lights)
+        val (paired, ambiguous) = ResilientLight.pairRoomLights(room.lights) { cache.get(it)?.friendlyName }
         val lightTiles = paired.map { rl -> lightTile(rl, cache) }
 
         val mediaTiles = room.media.map { id -> mediaTile(id, room, cache) }

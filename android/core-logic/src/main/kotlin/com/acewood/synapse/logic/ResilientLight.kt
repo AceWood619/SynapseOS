@@ -38,22 +38,39 @@ data class ResilientLight(
 
     companion object {
         /**
-         * Pair a room's lights into resilient controls. SAFE auto-pairing only: when a room has
-         * exactly one local and one cloud light they're clearly the same bulb, so pair them.
-         * Rooms with several of each are left unpaired (listed individually) and flagged, so we
-         * never bind the wrong two lights together.
+         * Pair a room's lights (local cync_lan ⇄ cloud zz_cloud twins) into resilient controls.
+         * SAFE: only pairs when confident, never binds the wrong two bulbs together.
+         *  1. exactly one local + one cloud → clearly the same bulb, pair them.
+         *  2. otherwise, pair a cloud to a local whose **friendly name matches** (via [nameOf]), since
+         *     the local cync_lan entity id is just a number but its HA friendly name is the real
+         *     device name. Unmatched lights are listed on their own.
+         * [ambiguous] = some local and some cloud are left unpaired, so Mason (or a config map) may
+         * still need to say which is which.
          */
-        fun pairRoomLights(lights: List<String>): Pair<List<ResilientLight>, Boolean> {
+        fun pairRoomLights(lights: List<String>, nameOf: (String) -> String? = { null }): Pair<List<ResilientLight>, Boolean> {
             val locals = lights.filter { !it.contains("zz_cloud") }
             val clouds = lights.filter { it.contains("zz_cloud") }
+            fun name(id: String) = nameOf(id)?.trim()?.ifBlank { null } ?: prettyName(id)
+            fun norm(id: String) = name(id).lowercase()
+                .replace(Regex("\\b(light|lights|lamp)\\b"), "").replace(Regex("[^a-z0-9]+"), " ").trim()
+
             if (locals.size == 1 && clouds.size == 1) {
-                // Name from the cloud entity — its name is human-readable; the local one is numeric.
-                return listOf(ResilientLight(prettyName(clouds[0]), locals[0], clouds[0])) to false
+                return listOf(ResilientLight(name(clouds[0]), locals[0], clouds[0])) to false
             }
-            // Can't safely auto-pair: present each on its own; ambiguous=true if both kinds exist.
-            val singles = lights.map { ResilientLight(prettyName(it), if (it.contains("zz_cloud")) null else it, if (it.contains("zz_cloud")) it else null) }
-            val ambiguous = locals.isNotEmpty() && clouds.isNotEmpty()
-            return singles to ambiguous
+
+            // name-based matching (only pairs on an exact normalized-name match)
+            val usedLocal = HashSet<String>()
+            val pairs = ArrayList<ResilientLight>()
+            for (cloud in clouds) {
+                val key = norm(cloud)
+                val match = locals.firstOrNull { it !in usedLocal && key.isNotBlank() && norm(it) == key }
+                if (match != null) { usedLocal.add(match); pairs.add(ResilientLight(name(cloud), match, cloud)) }
+                else pairs.add(ResilientLight(name(cloud), null, cloud))
+            }
+            locals.filterNot { it in usedLocal }.forEach { pairs.add(ResilientLight(name(it), it, null)) }
+            val unpairedCloud = pairs.any { it.local == null && it.cloud != null }
+            val unpairedLocal = pairs.any { it.cloud == null && it.local != null }
+            return pairs to (unpairedCloud && unpairedLocal)
         }
 
         fun prettyName(entityId: String): String {
