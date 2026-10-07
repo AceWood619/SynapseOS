@@ -72,7 +72,7 @@ Checklist:
 - [ ] Use the **same patched "v5" system image**. A fresh GSI loses the props spoofing and breaks TrustKernel / `/data` decryption.
 - [ ] Do the "reset reboot" (`reboot 'dm-verity enforcing'`) first, per your handoff.
 - [ ] Re-create `/metadata/gsi/dsu/install_status=ok` for persistent boot, the same way you did before.
-- [ ] Size: about 19 GB is free. **10 GiB** leaves room on stock and covers voice models, logs and snapshots. 12 GiB is the most I'd use.
+- [x] **Done on device (2026-10-07): 7 GiB.** Correction to my earlier 10 GiB suggestion: gsid refuses any install that leaves < ~8.8 GB free on stock /data, so ~7.97 GB is the ceiling. See `devices/stratus-c8/BOOT_AND_INSTALL_NOTES.md`.
 - [ ] Everything currently in DSU `/data` gets wiped. Today that's just test files.
 
 **Untested recovery path:** from fastbootd (`fastboot reboot fastboot`), run `fastboot gsi disable` (boot stock next time) or `fastboot gsi wipe` (delete the DSU). Test `gsi disable` once **on purpose** while everything works, so you know the escape hatch works before you need it.

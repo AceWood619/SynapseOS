@@ -7,4 +7,6 @@ Shared notes between Claude sessions (and humans) working on SynapseOS. **Pull b
 | `devices/<device>/HARDWARE_AUDIT.md` | Verified hardware/API capability audit per test device |
 | `devices/<device>/BOOT_AND_INSTALL_NOTES.md` | How SynapseOS is installed/booted on that device, quirks, recovery paths |
 
+**Two chats work in parallel. Read `coord/PROTOCOL.md` first, then `coord/STATUS.md` and `coord/REQUESTS.md`.**
+
 Conventions: mark facts **verified / inferred / unknown**. Never commit secrets, Wi-Fi names or passwords, HA tokens, or shelter guest names.
