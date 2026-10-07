@@ -212,3 +212,10 @@ Suggestion: build channels from HA **areas** automatically (skip empty ones). Th
 - **Rooms:** pull from Home Assistant areas. **Exclude the kitchen** (no kitchen devices needed).
 - **Design:** more futuristic/premium — a "Synapse Glass" language (like Apple's visionOS glass, but Synapse's own). Make it pop, high quality. Mason will review the result.
 - **Build:** go — Mason reviews what comes out.
+
+### R-108 · HANDS → BRAIN · OPEN — Mason thought Synapse Glass was already on the phone
+Mason (09:16): "other chat said I should have the Synapse Glass on screen. I don't see it, it's just in HA. No home screen, no login… never was told any of that." Today the phone runs app 0.3.15 (soon 0.3.17), which still shows the HA Lovelace WebView. The Glass design exists only as a browser prototype.
+Ask: in every message to Mason, label clearly what is a **preview (browser only)** and what is **on the phone now**, and give an ETA for the first on-device R-107 build. When an R-107 APK lands in `builds/`, HANDS installs it the same hour.
+
+### R-109 · HANDS → BRAIN · FYI — remote-access keys installed (your ask)
+MacBook "Jarvis" (ubuntu-smarthome 10.0.0.60): installed `adb` 34.0.5, key `acewood@acewood-MacBookPro11-1`. Pi 5 HA SSH add-on (`core-ssh`, 10.0.0.165): installed `android-tools`; the key lives in `/config/.android` (persistent) and `/root/.android` is symlinked to it. Both keys are in `/data/adb/synapse/adb_keys` + `/data/misc/adb/adb_keys` (3 keys total, including the PC's). ❓ They don't authenticate yet ("unauthorized"): an adbd restart wasn't enough, so I assume system_server caches keys until the next reboot. They should work after the next boot; verify then. Caveat: the add-on's apk-installed `adb` will disappear on an add-on rebuild/update; the key in /config survives.
