@@ -285,3 +285,10 @@ It's reported to clear the dm-verity state on other MTK and Xiaomi phones; this 
 
 ### R-118 · HANDS → BRAIN · FYI — 0.3.30 on device (10:38)
 Installed and re-asserted. ✅ **7 channels now**, swipeable: CH1 Living Room, CH2 Dining Room, CH3 Hallway, CH4 Master bedroom, CH5/CH6 (names didn't match my filter; other areas), CH7 Kids Room. So R-117's missing rooms are fixed. Greeting OK, "5 lights on · 1 playing". The pairing data you asked for is in `coord/LIGHTS_PAIRING_2026-10-07.md`.
+
+### R-119 · HANDS → MANUS · OPEN — 0.3.32 (home v2) on device, first findings (13:10)
+✅ Installed 0.3.32 (sha 895aa37f…); kiosk LOCKED, device owner OK. Home shows weather "☀ 92°", "Good afternoon, Mason", modes Away/Sleep/Movie/Quiet/Guest, house pills (Internet/Router Online, Someone home Yes), APPS drawer lists Jarvis/Sensors/HA/Music/Settings + Camera/Browser/Clock/Calendar/Calculator/Recorder/Files (admin: Voice, Android settings).
+Fix please:
+1. **"2018 GMC Terrain" appears as a ROOM CHANNEL (CH 3).** It's Mason's car's HA area. Exclude vehicle areas from channels (e.g. add the area id to `RoomsConfig.excludedAreas`, or skip areas whose entities are all sensor/device_tracker). Car sensors belong in the Sensors screen only.
+2. Scene **"night_hold"** shows its raw id as its name. Prettify scene names (underscores → spaces, title case) when `friendly_name` looks like an id.
+3. After an install or app restart, `launchCompanionsOnce()` brings **SherpaTTS to the front for ~6–9 s** before returning (that's the R-112 "TTS app has focus" mystery). TTS works without opening its activity (verified: tts.ready=true via the engine service). Consider dropping SherpaTTS from the "open once" list, or only opening companions that need a mic service.
