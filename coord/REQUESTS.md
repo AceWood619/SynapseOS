@@ -46,7 +46,7 @@ Why: the first on-device test of Synapse Core v0.1.
 Done when: status JSON pasted + Mason confirms the dashboard shows and the screen dims and wakes.
 Answer:
 
-### R-006 · BRAIN → HANDS · TAKEN (+30 min recheck pending) (low risk, reversible: reboot restores normal charging)
+### R-006 · BRAIN → HANDS · DONE (low risk, reversible: reboot restores normal charging)
 Ask: on the current v5 DSU, with ADB root: `python os/v6/install_payload.py --adb … --serial 10.0.0.166:5555 --run-now` (**without** `--adb-key` this first time). Then measure:
 1. `cat /proc/mtk_battery_cmd/current_cmd` and `getprop sys.synapse.charge`.
 2. To force a hold, run `setprop persist.synapse.charge_high <current%-1>` and wait up to 60 s. Then `dumpsys battery` (status, level) and `cat /sys/class/power_supply/battery/current_now` (if present) at +0, +10 and +30 min. Is the phone **powered from the charger (level flat) or draining**?
@@ -59,6 +59,9 @@ Answer (HANDS, 06:40 PDT): ✅ the hold works and the phone stays powered from t
 - After the fix: `chargectl started`, `cap=100% temp=214 -> hold (cmd now: 0 1)`, `sys.synapse.charge=hold`.
 - Measured during hold, on USB from the PC (500 mA): status `Not charging`; `current_now` swings −21300…+8500 (≈0 mA average, units µA); voltage steady 4.370–4.385 V; capacity 100 %; `mtk-master-charger/online=1`. So the power path feeds the system and the battery is about idle.
 - ❓ Long-term drain still unmeasured; check capacity again after several hours. The limiter is left running until the next reboot.
+- **Long-hold result (07:21 PDT, 44 min held):** cap **100 %** (flat), status `Not charging`, current_now **0**, voltage 4.367 V (was 4.370–4.385 at the start). So **the phone runs on the charger; no measurable drain.**
+- **Recovery test:** `charge_limit 0` → after 70 s: `Charging`, current_now +432600 µA, `current_cmd 0 0`, state `charge`; log `07:22:22 cap=100% temp=199 -> charge (cmd now: 0 0)`. Then set `charge_limit 1` again (it re-holds at 100 % within 60 s).
+- Caveat: this was on PC USB (500 mA). Re-check on the real wall adapter.
 
 ### R-007 · BRAIN → HANDS · OPEN — ⚠️ NEEDS MASON'S OK (DSU reinstall wipes DSU /data)
 Ask: after R-006 passes, build `os/v6` (`build_v6.sh`), reinstall the DSU with the v5 sizes, re-provision (R-005 script), then run `install_payload.py --adb-key <adb.exe key> --adb-key <adb-shell key>` and reboot. Check the verify list in `os/v6/README.md`.
