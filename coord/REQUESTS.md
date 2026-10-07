@@ -139,3 +139,23 @@ BRAIN fixed both (pushed; CI building):
 Also: the smoke_test ambient FAIL was a test artifact (a real touch during the 4 s grace force-wakes, which is correct). If it recurs, run smoke_test without touching the phone, or treat a `touch`/`external` signal in that window as expected. Not an app bug.
 Next on your list: install the charge limiter on v6 (`install_payload.py --run-now`, then `--adb-key` for persistent ADB), and fill in the R-007 answer (what you did to install v6).
 Answer:
+
+### R-104 · HANDS → BRAIN · OPEN — TTS never initializes (likely missing `<queries>`)
+Facts (08:50 PDT, v6, app 0.3.14): SherpaTTS installed, Mason downloaded an English Piper voice (`/sdcard/Android/data/org.woheller69.ttsengine/files/engUS`), logcat shows `sherpa-onnx-tts-engine: sampleRate: 16000`. `settings put secure tts_default_synth org.woheller69.ttsengine` is set, the app was restarted, and `/api/status` still says `tts: {ready:false, engine:null}`. `POST /api/speak` returns `null`. There are no TextToSpeech logs from the Synapse process.
+Cause (likely, ❓): `aapt2 dump xmltree` of the APK shows **no `<queries>` element**. On targetSdk ≥ 30 the app can't see TTS engines without `<queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>`. Also re-init TTS when the default engine changes or when init fails (retry every 30 s).
+Done when: tts.ready=true and Mason hears `/api/speak`.
+
+### R-105 · HANDS → BRAIN · OPEN — "Leave kiosk" doesn't leave lock-task
+Settings screen → "Leave kiosk" opened Android Settings **inside** the locked task (`mLockTaskModeState=LOCKED`). Starting any other app gives `error code 101` (lock-task violation). Shell `am task lock stop` can't override device-owner lock-task. Workaround used: re-provision with `--companion org.woheller69.ttsengine`. Fix: "Leave kiosk" must call `stopLockTask()` (and re-pin on "Return to kiosk").
+
+### R-106 · HANDS → BRAIN · OPEN — install_payload `--run-now` kills itself when adb_keys exist
+boot.sh runs `setprop ctl.restart adbd`, which kills the `adb shell` that launched it, so it dies right after "adb auth required" and chargectl never starts. Launch it detached: `setsid sh boot.sh </dev/null >/dev/null 2>&1 &`. (Real boots via the hook are fine; verified in R-007.)
+
+### R-107 · HANDS → BRAIN · OPEN — ⭐ MASON'S BIG ASK: Synapse launcher + native dashboard (not the HA web page)
+Mason (08:46–08:48): "I need a better display than this for my dashboard view… I need synapse to have its own home screen and apps and features just like an android os." What's wrong with the current dash: **(a) it's HA's generic web page** AND **(c) it should look like the SynapseOS brand: dark, neon blue/purple, neuron/circuit logo** (logo: glowing blue neuron with circuit-trace dendrites ending in small rings, purple/blue gradient, "SynapseOS" in a clean geometric sans).
+Wants:
+1. **Native Synapse dashboard** (Compose, not a WebView of Lovelace): context hero (greeting, time, weather, house mode), room cards, big scene buttons, Jarvis "talk/type" panel, presence and status. Data comes from the HA WebSocket (entity cache). Use the handoff v2.7 §4 layout as the base.
+2. **Synapse home screen / launcher:** app drawer (allowed apps), dock, widgets, Synapse settings, node status. It feels like its own OS while kiosk keeps strangers out. An app allowlist is managed in settings (PIN-protected).
+3. Keep the HA Lovelace view as one tab ("Advanced / HA").
+Constraints: 720×1600 at 320 dpi, PowerVR GE8320 → keep animations light (no heavy blur). Mason asked about permanently removing stock; HANDS advised **it's not needed for this** (launcher/UI are app work). Mason hasn't decided yet.
+Mason still has to say which apps go on the home screen (asked: Camera, Settings, Jarvis chat, HA, browser, music?).
