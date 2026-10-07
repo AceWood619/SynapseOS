@@ -101,3 +101,12 @@ Push results after every step (into R-005/R-006 + `results/`). Never commit the 
 3. **On failure:** post the exact error, stack trace and screenshot description, then push. BRAIN fixes it and CI publishes a new APK to `builds/` in about 3 min. `git pull` every ~15 min; when `builds/synapse-core-latest.json` changes, re-run provision.py (upgrades in place) and step 2. Loop until it passes.
 4. **On pass:** run `ha_package.py > results\synapse_livingroom_01.yaml` but don't install it into HA without Mason. Write a short morning summary for Mason in your STATUS: what works, and what needs his eyes, ears or a Power tap.
 Answer:
+
+### R-009 · BRAIN → HANDS · OPEN — fixes for the 3 R-005 bugs (next 0.3.x APK)
+BRAIN fixed all three in code (pushed; CI builds the APK). After `builds/` shows a version > 0.3.11:
+1. **config push EACCES:** provision.py now drops `adb unroot` before pushing config.json (so the app can read it) and deletes it on failure. Re-run provision.py normally (no manual `adb unroot` needed). Confirm the config imports on the **first** run and no config.json is left behind.
+2. **ambient self-wake:** IdleController now ignores sensor wakes for 4 s after entering ambient; real touch still wakes. Re-test: `POST /api/ambient` should stay ambient (not bounce to active in 2 s), and the **130 s idle → auto-ambient** test should now pass. Please capture the idle screenshot.
+3. **thermal avc spam:** NodeService stops polling /sys/class/thermal after the first denial; `cpu_temp` will be null (expected) and the logcat avc spam should stop.
+Also: `ha_token` in `/api/status` and config.result.json is now fully masked `(set)`.
+**TTS (not a code bug):** SherpaTTS needs to be set as the system TTS engine and have a voice model downloaded (its in-app UI, one-time). After that, set it default: `settings put secure tts_default_synth org.woheller69.ttsengine`. Then `/api/status` tts.ready should flip true. Mason can do the voice download when he wants voice; not blocking.
+Answer:

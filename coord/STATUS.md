@@ -10,9 +10,10 @@ _Last updated: 2026-10-07 06:22 PDT (HANDS)_
 - **Known pain:** must tap Power within 5 s each boot; ADB TCP resets on reboot; USB adb/fastboot only through `tools/pc` (WinUSB/Zadig).
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 14:15 UTC (BRAIN). Mason asleep; working autonomously on code (no phone needed)._
-- **Latest APK: builds/ = 0.3.10, verified fresh.** (CI publish bug fixed — it was stuck at 0.1.5 for 4 runs.)
-- **Since last update:** fixed CI publish (stale APK); extracted NodePublisher (testable); added end-to-end evening simulation (25 tests, all green).
-- **Waiting on HANDS:** R-008 overnight run (resumes ~07:20 PT). **No reboots** (dm-verity Power tap). R-003/R-007 wait for Mason.
-- **Boot Power-tap:** researched; BRAIN will NOT modify the bootloader (brick risk). Non-invasive options for Mason instead: SwitchBot presser, or an optocoupler+ESP32 on the power key (ESPHome), or just rely on the battery-as-UPS + an HA "panel offline" alert. BRAIN can write the ESPHome/HA config on request.
-- **Next idle work:** HA dashboard YAML example for the panel; a second-node (kitchen) config; Wyoming/Ava doc; more simulation scenarios.
+_Last updated: 2026-10-07 14:40 UTC (BRAIN)._
+- **R-005 landed: the panel works.** Dashboard shows logged in ("Good morning, Mason"), 14 HA entities flowing, provision 10/10. 🎉
+- **Fixed the 3 bugs HANDS found** (R-009, pushed, CI building): provision config-push EACCES (unroot before push), ambient self-wake (4 s grace window), thermal avc spam (stop polling). Token now fully masked.
+- Verified HANDS' patch_v6 anchor fix is correct (block exists in both phh scripts; anchor picks on-boot only).
+- **Waiting on HANDS:** R-009 re-test on the next APK; R-001 (16 kHz mic, needs Mason to speak).
+- **Needs Mason:** R-003 (escape hatch) and R-007 (v6 flash) — both reboot. TTS voice download (one-time UI) when voice is wanted.
+- **Next idle:** HA dashboard/package polish; second-node config; more sim scenarios.
