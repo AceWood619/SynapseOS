@@ -16,8 +16,15 @@ data class Room(
     val media: List<String>,        // domain media_player.* (the D-pad target)
     val extras: List<String>,       // other switches/toggles (jarvis mic, mutes, alerts) — a "more" section
     val remotes: List<String> = emptyList(),  // domain remote.* (Roku etc.) — powers the D-pad send_command
+    val fans: List<String> = emptyList(),      // fan.*
+    val covers: List<String> = emptyList(),    // cover.* (blinds, garage)
+    val climate: List<String> = emptyList(),   // climate.* (thermostats)
+    val locks: List<String> = emptyList(),     // lock.*
+    val sensors: List<String> = emptyList(),   // sensor.* / binary_sensor.* — read-only tiles
 ) {
-    val hasControls get() = lights.isNotEmpty() || switches.isNotEmpty() || media.isNotEmpty() || extras.isNotEmpty()
+    val hasControls get() = lights.isNotEmpty() || switches.isNotEmpty() || media.isNotEmpty() ||
+        fans.isNotEmpty() || covers.isNotEmpty() || climate.isNotEmpty() || locks.isNotEmpty() ||
+        extras.isNotEmpty() || sensors.isNotEmpty()
     val primaryMedia get() = media.firstOrNull()
     val primaryRemote get() = remotes.firstOrNull()
 }
@@ -53,6 +60,11 @@ object Rooms {
         val switches = switchesAll - extras.toSet()
         val media = a.entities.filter { it.startsWith("media_player.") }
         val remotes = a.entities.filter { it.startsWith("remote.") }
-        return Room(a.id, a.name, lights, switches, media, extras, remotes)
+        val fans = a.entities.filter { it.startsWith("fan.") }
+        val covers = a.entities.filter { it.startsWith("cover.") }
+        val climate = a.entities.filter { it.startsWith("climate.") }
+        val locks = a.entities.filter { it.startsWith("lock.") }
+        val sensors = a.entities.filter { it.startsWith("sensor.") || it.startsWith("binary_sensor.") }
+        return Room(a.id, a.name, lights, switches, media, extras, remotes, fans, covers, climate, locks, sensors)
     }
 }

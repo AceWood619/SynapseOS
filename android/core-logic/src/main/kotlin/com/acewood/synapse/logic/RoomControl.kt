@@ -13,6 +13,8 @@ object RoomControl {
         val brightnessPct: Int?,   // 0..100; null when not dimmable or unknown
         val dimmable: Boolean,
         val available: Boolean,    // false = HA reports unavailable/unknown on both paths
+        val colorCapable: Boolean = false,      // supports rgb/hs/xy color — show swatches
+        val colorTempCapable: Boolean = false,  // supports color_temp — show a warm↔cool slider
     )
 
     data class MediaTile(
@@ -29,6 +31,22 @@ object RoomControl {
 
     data class ToggleTile(val entityId: String, val name: String, val isOn: Boolean, val available: Boolean)
 
+    data class FanTile(val entityId: String, val name: String, val isOn: Boolean,
+                       val speedPct: Int?, val supportsSpeed: Boolean, val available: Boolean)
+
+    data class CoverTile(val entityId: String, val name: String, val state: String,
+                         val positionPct: Int?, val supportsPosition: Boolean, val available: Boolean) {
+        val isOpen get() = state == "open" || (positionPct ?: 0) > 0
+    }
+
+    data class ClimateTile(val entityId: String, val name: String, val mode: String,
+                           val currentTemp: Double?, val targetTemp: Double?,
+                           val minTemp: Double, val maxTemp: Double, val step: Double, val available: Boolean)
+
+    data class LockTile(val entityId: String, val name: String, val locked: Boolean, val available: Boolean)
+
+    data class SensorTile(val entityId: String, val name: String, val value: String, val unit: String)
+
     data class Model(
         val roomId: String,
         val roomName: String,
@@ -36,6 +54,11 @@ object RoomControl {
         val lightsAmbiguous: Boolean,  // local+cloud present but not safely pairable (needs Mason's mapping)
         val media: List<MediaTile>,
         val extras: List<ToggleTile>,
+        val fans: List<FanTile> = emptyList(),
+        val covers: List<CoverTile> = emptyList(),
+        val climate: List<ClimateTile> = emptyList(),
+        val locks: List<LockTile> = emptyList(),
+        val sensors: List<SensorTile> = emptyList(),
     ) {
         val anyLightOn get() = lights.any { it.isOn }
         val lightCount get() = lights.size
@@ -63,7 +86,52 @@ object RoomControl {
             ToggleTile(id, e?.friendlyName ?: pretty(id), e?.on ?: false, available(e))
         }
 
-        return Model(room.id, room.name, lightTiles, ambiguous, mediaTiles, extraTiles)
+        return Model(
+            room.id, room.name, lightTiles, ambiguous, mediaTiles, extraTiles,
+            fans = room.fans.map { fanTile(it, cache) },
+            covers = room.covers.map { coverTile(it, cache) },
+            climate = room.climate.map { climateTile(it, cache) },
+            locks = room.locks.map { lockTile(it, cache) },
+            sensors = room.sensors.mapNotNull { sensorTile(it, cache) },
+        )
+    }
+
+    private fun fanTile(id: String, cache: EntityCache): FanTile {
+        val e = cache.get(id)
+        val feat = (e?.attrDouble("supported_features") ?: 0.0).toInt()
+        val pct = e?.attrDouble("percentage")?.toInt()?.coerceIn(0, 100)
+        return FanTile(id, e?.friendlyName ?: pretty(id), e?.on ?: false, pct, has(feat, 1 /* SET_SPEED */), available(e))
+    }
+
+    private fun coverTile(id: String, cache: EntityCache): CoverTile {
+        val e = cache.get(id)
+        val feat = (e?.attrDouble("supported_features") ?: 0.0).toInt()
+        val pos = e?.attrDouble("current_position")?.toInt()?.coerceIn(0, 100)
+        return CoverTile(id, e?.friendlyName ?: pretty(id), e?.state ?: "unavailable", pos, has(feat, 4 /* SET_POSITION */), available(e))
+    }
+
+    private fun climateTile(id: String, cache: EntityCache): ClimateTile {
+        val e = cache.get(id)
+        return ClimateTile(
+            id, e?.friendlyName ?: pretty(id), e?.state ?: "unavailable",
+            currentTemp = e?.attrDouble("current_temperature"),
+            targetTemp = e?.attrDouble("temperature"),
+            minTemp = e?.attrDouble("min_temp") ?: 50.0,
+            maxTemp = e?.attrDouble("max_temp") ?: 90.0,
+            step = e?.attrDouble("target_temp_step") ?: 1.0,
+            available = available(e),
+        )
+    }
+
+    private fun lockTile(id: String, cache: EntityCache): LockTile {
+        val e = cache.get(id)
+        return LockTile(id, e?.friendlyName ?: pretty(id), e?.state == "locked", available(e))
+    }
+
+    private fun sensorTile(id: String, cache: EntityCache): SensorTile? {
+        val e = cache.get(id) ?: return SensorTile(id, pretty(id), "—", "")
+        val unit = e.attributes["unit_of_measurement"] as? String ?: ""
+        return SensorTile(id, e.friendlyName, e.state, unit)
     }
 
     private fun lightTile(rl: ResilientLight, cache: EntityCache): LightTile {
@@ -71,14 +139,22 @@ object RoomControl {
         val e = src?.let { cache.get(it) }
         val dimmable = isDimmable(e)
         val bri = e?.attrDouble("brightness")?.let { ((it / 255.0) * 100).toInt().coerceIn(0, 100) }
+        val modes = colorModes(e)
         return LightTile(
             light = rl,
             isOn = rl.isOn(cache),
             brightnessPct = if (dimmable) bri else null,
             dimmable = dimmable,
             available = available(e),
+            colorCapable = modes.any { it in setOf("hs", "rgb", "rgbw", "rgbww", "xy") },
+            colorTempCapable = "color_temp" in modes,
         )
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun colorModes(e: Entity?): Set<String> =
+        (e?.attributes?.get("supported_color_modes") as? List<Any?>)
+            ?.mapNotNull { (it as? String)?.lowercase() }?.toSet() ?: emptySet()
 
     private fun mediaTile(id: String, room: Room, cache: EntityCache): MediaTile {
         val e = cache.get(id)

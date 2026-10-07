@@ -629,3 +629,50 @@ class OwnerNameTest {
         assertEquals("", c.ownerName)
     }
 }
+
+class RoomControlExpandedTest {
+    private fun cache(vararg e: Entity) = EntityCache().apply { applyStates(e.toList()) }
+    private fun room(vararg ents: String) =
+        Rooms.build(listOf(Area("living_room", "Living Room", ents.toList()))).first()
+
+    @Test fun detectsColorAndColorTempCapability() {
+        val c = cache(
+            Entity("light.rgb", "on", mapOf("supported_color_modes" to listOf("rgb", "color_temp"), "brightness" to 255.0)),
+            Entity("light.ct", "on", mapOf("supported_color_modes" to listOf("color_temp"))),
+            Entity("light.plain", "on", mapOf("supported_color_modes" to listOf("onoff"))))
+        val rgb = RoomControl.build(room("light.rgb"), c).lights.single()
+        assertTrue(rgb.colorCapable); assertTrue(rgb.colorTempCapable)
+        val ct = RoomControl.build(room("light.ct"), c).lights.single()
+        assertFalse(ct.colorCapable); assertTrue(ct.colorTempCapable)
+        val plain = RoomControl.build(room("light.plain"), c).lights.single()
+        assertFalse(plain.colorCapable); assertFalse(plain.colorTempCapable)
+    }
+    @Test fun buildsFanCoverClimateLockSensor() {
+        val c = cache(
+            Entity("fan.ceiling", "on", mapOf("percentage" to 66.0, "supported_features" to 1.0)),
+            Entity("cover.blinds", "open", mapOf("current_position" to 40.0, "supported_features" to 4.0)),
+            Entity("climate.nest", "heat", mapOf("current_temperature" to 68.0, "temperature" to 71.0,
+                "min_temp" to 50.0, "max_temp" to 90.0, "target_temp_step" to 1.0)),
+            Entity("lock.front", "locked", emptyMap()),
+            Entity("sensor.temp", "72.4", mapOf("unit_of_measurement" to "°F", "friendly_name" to "Living Temp")))
+        val m = RoomControl.build(room("fan.ceiling", "cover.blinds", "climate.nest", "lock.front", "sensor.temp"), c)
+        assertEquals(66, m.fans.single().speedPct); assertTrue(m.fans.single().supportsSpeed)
+        assertEquals(40, m.covers.single().positionPct); assertTrue(m.covers.single().isOpen)
+        assertEquals(71.0, m.climate.single().targetTemp); assertEquals(68.0, m.climate.single().currentTemp)
+        assertTrue(m.locks.single().locked)
+        assertEquals("72.4", m.sensors.single().value); assertEquals("°F", m.sensors.single().unit)
+    }
+    @Test fun roomsBuilderClassifiesNewDomains() {
+        val r = room("light.a", "fan.b", "cover.c", "climate.d", "lock.e", "sensor.f", "binary_sensor.g")
+        assertEquals(listOf("light.a"), r.lights)
+        assertEquals(listOf("fan.b"), r.fans)
+        assertEquals(listOf("cover.c"), r.covers)
+        assertEquals(listOf("climate.d"), r.climate)
+        assertEquals(listOf("lock.e"), r.locks)
+        assertEquals(listOf("sensor.f", "binary_sensor.g"), r.sensors)
+    }
+    @Test fun roomWithOnlySensorsStillAppears() {
+        val rooms = Rooms.build(listOf(Area("front_door", "Front Door", listOf("binary_sensor.door", "lock.front"))))
+        assertEquals(listOf("Front Door"), rooms.map { it.name })   // no longer dropped for lacking lights/media
+    }
+}
