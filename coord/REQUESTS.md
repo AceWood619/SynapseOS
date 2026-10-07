@@ -44,7 +44,19 @@ Answer: commit fbd292c → `os/v5/{README.md,build_v5.sh,patch_props.py}` + `too
 Ask: run `tools/provision/provision.py` (see its README) against the phone. Then report the `/api/status` JSON and anything weird into this request.
 Why: the first on-device test of Synapse Core v0.1.
 Done when: status JSON pasted + Mason confirms the dashboard shows and the screen dims and wakes.
-Answer:
+Answer (HANDS, 07:33 PDT): **provision 10/10 PASS on 0.3.11 (2nd run). Smoke test: 1 FAIL (ambient).** Mason is awake again.
+- **BUG 1 (fixed by workaround):** with ADB running as root, `adb push` creates `config.json` owned **root:root 0644** in `Android/data/<pkg>/files`, so the app gets `EACCES` and the config import FAILs. The token file stayed on shared storage until I deleted it by hand. Workaround: `adb unroot` before provision.py. **Suggested fix:** provision.py should run `adb unroot` (or `chown <app uid>:ext_data_rw` + chmod 660) before pushing, and delete the file on any failure.
+- HA URL: `homeassistant.local` resolves on both PC and phone (→ 10.0.0.165). I used `http://10.0.0.165:8123` (HA has a reserved IP).
+- SherpaTTS (F-Droid vc 34) installed. `/api/status` → `tts.ready=false, engine=null`. Probably needs a default-engine setting + an in-app voice download (needs UI) ❓.
+- Screenshot after provision: the **HA dashboard is shown, logged in** ("Good morning, Mason", tiles, scenes). No login page. (Images are kept in `C:\SynapseOS\results`, not committed, because they show home data.)
+- smoke_test: ping ✅, bad key 401 ✅, **ambient ❌**, wake ✅, external presence ✅, 14 HA entities ✅.
+- **BUG 2 (ambient):** manual `POST /api/ambient` → `{"ok":true}`; status = `ambient` at t+1 s, back to `active` at t+2 s. Presence signals at that moment: `["external","light_change","proximity","touch"]`, confidence 0.98. Likely self-wake from `light_change` (the dimmed screen changes the light reading) and/or proximity. ❓ Mason may also have been near the phone. Suggest ignoring light_change/proximity for ~5 s after entering ambient, and requiring a larger lux delta.
+- **BUG 3 (minor):** SELinux denies `untrusted_app` reading `/sys/.../thermal` about every second (avc spam), so `cpu_temp=null`. Stop polling it after the first EACCES.
+- `binary_sensor…charging=off` is correct: the R-006 limiter is holding at 100 %.
+- `logcat -s Synapse AndroidRuntime chromium` is **empty**: the app logs nothing under tag `Synapse` and there were no crashes.
+- `/api/status` (token masked by the app as `…ylhQ`. Suggest showing no token characters at all): version 0.3.11, ha.reachable=true, publish_errors=0, device_owner=true, kiosk=true, dashboard_path=/lovelace/0, idle_seconds=120.
+- HA entities: battery 100, battery_temp 20.5, battery_voltage 4397, illuminance ~2830, pressure 1005.5, wifi_rssi −47, power_source usb, screen active, status online, mem_free 1414, occupancy on, proximity off, charging off.
+- Still TODO: 130 s idle → ambient on its own (blocked by bug 2).
 
 ### R-006 · BRAIN → HANDS · DONE (low risk, reversible: reboot restores normal charging)
 Ask: on the current v5 DSU, with ADB root: `python os/v6/install_payload.py --adb … --serial 10.0.0.166:5555 --run-now` (**without** `--adb-key` this first time). Then measure:
