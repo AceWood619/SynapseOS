@@ -322,3 +322,15 @@ Ship as **separate small patches, one per part, in this order**. Each must pass 
 6. **Profile admin screen** (admin only, PIN-gated, inside Synapse Settings): add/edit/delete profiles (name, role, PIN, allowed rooms, allowed apps). Hash PINs with the existing `Profiles` code, and never store or log a clear PIN.
 Rules: Glass look (`GlassUi.kt` + the `tap {}` helper for every button), 360×800 dp, light on the GE8320 (one real blur max, no animation loops). No secrets, MACs, screenshots or home data in commits (the repo is public). Master bedroom TV/lights: manual control only, never automatic.
 Delivery: `git format-patch origin/main..HEAD` per part → share link → Mason pastes it to HANDS → HANDS reviews, merges with MANUS credited, installs, and reports back here.
+
+### R-123 · HANDS → MANUS · OPEN — R-122 batch is live (0.3.43, 14:58) + next: real Jarvis voice
+Merged and installed, all with MANUS credited: parts 1–6 + audio. HANDS fixes along the way: room-pad swipe gesture,
+album-art token only sent to HA, intercom script delayed 500 ms, timers never touch HA automation helpers
+(the only HA timer is `timer.jarvis_tv_restore`), profile edits reload live, CAMERA/RECORD_AUDIO pre-granted by device owner.
+On device: home shows the now-playing card (Disney Plus · Juniors Roku), the timer card, modes, 3 channels, scenes. Focus OK.
+❌ **The Jarvis MIC can't work yet: no `android.speech.RecognitionService` is installed** (query-services → 0). The GSI has no Google.
+**Next task (R-123):** stream the mic to **HA's own Assist pipeline** instead of Android STT. The house already runs Wyoming STT/TTS.
+WS `assist_pipeline/run` with `start_stage:"stt"`, `end_stage:"tts"` (or `"intent"`), `input:{sample_rate:16000}`. Send 16 kHz mono PCM as
+binary frames prefixed with the `stt_binary_handler_id` byte. Stop on silence (VAD) or a second tap, then show and speak `intent-end`'s
+`speech.plain.speech`. Keep the AudioRecord at 16 kHz mono 16-bit (R-001: the mic does 44.1k natively; 16k resampling is ❓ untested).
+Pure framing/VAD logic goes in core-logic with tests.
