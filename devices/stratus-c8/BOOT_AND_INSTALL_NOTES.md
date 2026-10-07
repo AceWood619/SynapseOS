@@ -12,7 +12,11 @@ Legend: ✅ verified on device · ⚠️ caveat · ❓ unconfirmed
 - ✅ The current kernel shows **no** live verity errors. The flag is leftover from earlier failed experiments.
 - ✅ `reboot 'dm-verity enforcing'` does **not** clear it.
 - ✅ Flashing a re-signed vbmeta and booting **recovery** did **not** clear it (managed mode probably only runs on normal boot) ❓
-- ❓ Next test: boot normally with the re-signed vbmeta (`vbmeta_reset.img`, same AOSP test key cdbb7717…, with an extra prop). This also tells us whether TrustKernel cares about the vbmeta digest (key fact for a permanent install).
+- ✅ 2026-10-07 06:00 test: booted normally with the re-signed vbmeta (`vbmeta_reset.img`, same AOSP test key cdbb7717…, digest `bcc619fb…` vs factory `8d18b566…`). Results:
+  - Warning **still shown**. So the eio flag is **not** keyed to the vbmeta digest the way libavb docs suggest. It's likely a plain seccfg flag. Clearing it needs more LK reverse-engineering.
+  - **TrustKernel does NOT care about the vbmeta digest.** Boot completed, `/data` encrypted and mounted (233 app dirs), no keystore/root-of-trust errors, saved Wi-Fi credentials still worked.
+  - So the earlier permanent-flash failure was caused by something else (modified system_a / deleted product / `-w`), not by vbmeta. This reopens the path to a full install.
+- The phone currently runs with `vbmeta_reset.img` on vbmeta_a. Factory copy: `C:\c8backup\vbmeta_a.img` (SHA-256 7527212b…).
 
 ## Proven persistent-DSU recipe
 1. On stock: `adb shell "reboot 'dm-verity enforcing'"`
@@ -29,7 +33,9 @@ Legend: ✅ verified on device · ⚠️ caveat · ❓ unconfirmed
   - Use the tools below instead.
 - ✅ **Fastboot (LK):** `python C:\gsiL\fb.py getvar|flash <part> <file>|reboot` (pyusb + libusb). Max download 0x8000000.
 - ✅ **ADB over USB:** `python C:\gsiL\uadb.py "<cmd>"` (adb-shell + libusb).
-- ✅ **ADB over Wi-Fi:** `persist.adb.tcp.port=5555` is set in the DSU → `adb connect <phone-ip>:5555`. Set a DHCP reservation for the phone.
+- ✅ **ADB over Wi-Fi:** the phone has a reserved IP on the Xfinity gateway (DSU Wi-Fi MAC is randomized but persistent; it changes if the DSU is reinstalled).
+  - ⚠️ The TCP port does **not** survive reboot (`persist.adb.tcp.port` gets reset). After each boot, run `uroot.py` (adb-shell `root()`, then `setprop service.adb.tcp.port 5555`, then `setprop ctl.restart adbd`).
+  - TODO: make it permanent with an init script in the image.
 - fastbootd (recovery, `18D1:4EE0`) works with stock `fastboot.exe` but **can't flash vbmeta** ("No such file or directory").
 - Recovery ADB (`18D1:D001`) = unauthorized.
 
