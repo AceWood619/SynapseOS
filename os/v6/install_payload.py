@@ -35,7 +35,12 @@ def main():
         sys.exit("adb is not root. Run `adb root` (or tools/pc/uroot.py) first.")
     sh(f"mkdir -p {D}; chmod 0700 {D}; chown root:root {D}")
     for name in ("boot.sh", "chargectl.sh"):
-        subprocess.run(base + ["push", str(HERE / name), f"{D}/{name}"], check=True, capture_output=True)
+        # Strip Windows line endings (a CRLF checkout breaks /system/bin/sh), then push.
+        data = (HERE / name).read_bytes().replace(b"\r\n", b"\n")
+        with tempfile.NamedTemporaryFile("wb", delete=False, suffix=".sh") as tf:
+            tf.write(data)
+        subprocess.run(base + ["push", tf.name, f"{D}/{name}"], check=True, capture_output=True)
+        Path(tf.name).unlink()
         sh(f"chmod 0700 {D}/{name}; chown root:root {D}/{name}")
     if a.adb_key:
         keys = "".join(Path(k).read_text().strip() + "\n" for k in a.adb_key)
