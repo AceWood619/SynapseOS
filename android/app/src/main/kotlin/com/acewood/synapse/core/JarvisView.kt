@@ -21,7 +21,8 @@ import android.widget.TextView
  * spoken on this panel. The mic button hands off to the voice assistant.
  */
 @SuppressLint("ViewConstructor")
-class JarvisView(context: Context, private val onBack: () -> Unit, private val onVoice: () -> Unit) : FrameLayout(context) {
+class JarvisView(context: Context, private val onBack: () -> Unit, private val onVoice: () -> Unit,
+                 private val onIntercom: () -> Unit = {}) : FrameLayout(context) {
     private val g = Glass
     private val log = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(log) }
@@ -64,6 +65,7 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
             isHorizontalScrollBarEnabled = false
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
+                addView(chip("Announce to a room") { onIntercom() })
                 prompts.forEach { p -> addView(chip(p) { send(p) }) }
             })
         })

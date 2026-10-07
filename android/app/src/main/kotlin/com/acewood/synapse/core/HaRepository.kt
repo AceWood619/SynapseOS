@@ -1,6 +1,7 @@
 package com.acewood.synapse.core
 
 import com.acewood.synapse.logic.EntityCache
+import com.acewood.synapse.logic.IntercomTarget
 import com.acewood.synapse.logic.NodeConfig
 import com.acewood.synapse.logic.Room
 import com.acewood.synapse.logic.Rooms
@@ -74,6 +75,20 @@ object HaRepository {
     fun converse(text: String, conversationId: String?, onReply: (String, String?) -> Unit) {
         val c = client
         if (c == null) onReply("Home Assistant isn't connected right now.", conversationId) else c.converse(text, conversationId, onReply)
+    }
+
+    /** Select the hand-picked room, set the discovered message helper, then run the HA script. */
+    fun sendIntercom(target: IntercomTarget, room: String, message: String): Boolean {
+        val text = message.trim()
+        val inputId = target.messageInputId ?: return false
+        if (room.isBlank() || text.isBlank()) return false
+        callService("input_select", "select_option", listOf(target.roomSelectId), mapOf("option" to room))
+        callService("input_text", "set_value", listOf(inputId), mapOf("value" to text))
+        // HA may run WS service calls concurrently. Give the helpers a moment to land before the script reads them.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            callService("script", "turn_on", listOf(target.scriptId))
+        }, 500)
+        return true
     }
 
     private val OPTIMISTIC_DOMAINS = setOf("light", "switch", "input_boolean", "fan")

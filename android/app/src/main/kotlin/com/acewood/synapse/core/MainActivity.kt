@@ -55,6 +55,7 @@ class MainActivity : Activity() {
     private var roomPad: RoomPadView? = null
     private var sensorsView: SensorsView? = null
     private var jarvisView: JarvisView? = null
+    private var intercomView: IntercomView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -263,7 +264,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Back is handled inside the dashboard")
     override fun onBackPressed() {
-        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, drawerView).any { it?.visibility == View.VISIBLE }
+        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, drawerView).any { it?.visibility == View.VISIBLE }
         when {
             overlayOpen -> showHome()
             web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
@@ -405,7 +406,8 @@ class MainActivity : Activity() {
                 onApps = { showOverlay(drawerView) { it.open() } },
                 onSensors = { showOverlay(sensorsView) { it.open() } },
                 onLaunch = { app -> launchApp(app) },
-                onSwitchProfile = { switchProfile() }).also { h ->
+                onSwitchProfile = { switchProfile() },
+                onIntercom = { showOverlay(intercomView) { it.open() } }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
@@ -422,7 +424,13 @@ class MainActivity : Activity() {
             }
         }
         if (jarvisView == null) {
-            jarvisView = JarvisView(this, onBack = { showHome() }, onVoice = { openAssist() }).also { v ->
+            jarvisView = JarvisView(this, onBack = { showHome() }, onVoice = { openAssist() },
+                onIntercom = { showOverlay(intercomView) { it.open() } }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (intercomView == null) {
+            intercomView = IntercomView(this, onBack = { showHome() }).also { v ->
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
@@ -488,7 +496,7 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }

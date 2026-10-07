@@ -779,3 +779,26 @@ class NowPlayingTest {
         assertTrue(state.isActive)
     }
 }
+
+class IntercomTest {
+    @Test fun discoversConfiguredHelpersAndAvoidsMasterByDefault() {
+        val cache = EntityCache().apply { applyStates(listOf(
+            Entity("input_select.intercom_room", "Living Room", mapOf("options" to listOf("Master bedroom", "Living Room", "Kids Room"))),
+            Entity("input_text.intercom_message", "", mapOf("friendly_name" to "Intercom message")),
+            Entity("script.intercom_send", "off", emptyMap()),
+        )) }
+        val target = Intercom.resolve(cache)!!
+        assertEquals("input_text.intercom_message", target.messageInputId)
+        assertEquals("Living Room", target.defaultRoom)
+        assertTrue(Intercom.isMasterBedroom("Master bedroom"))
+    }
+
+    @Test fun doesNotGuessAnInputTextHelper() {
+        val cache = EntityCache().apply { applyStates(listOf(
+            Entity("input_select.intercom_room", "Living Room", mapOf("options" to listOf("Living Room"))),
+            Entity("input_text.random_note", "", mapOf("friendly_name" to "Shopping list")),
+            Entity("script.intercom_send", "off", emptyMap()),
+        )) }
+        assertNull(Intercom.resolve(cache)!!.messageInputId)
+    }
+}

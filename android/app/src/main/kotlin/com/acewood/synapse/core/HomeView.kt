@@ -44,6 +44,7 @@ class HomeView(
     private val onSensors: () -> Unit = {},
     private val onLaunch: (AppCatalog.App) -> Unit = {},
     private val onSwitchProfile: () -> Unit = {},
+    private val onIntercom: () -> Unit = {},
 ) : FrameLayout(context) {
     private val pillInitial = TextView(context)
     private val pillRole = TextView(context)
@@ -208,7 +209,7 @@ class HomeView(
         addView(g.spacer(context, w = 10))
         addView(micOrb())
         addView(g.spacer(context, w = 10))
-        addView(key("JARVIS", Glass.VIOLET) { AppCatalog.INTERNAL_APPS.firstOrNull { AppCatalog.key(it) == "jarvis" }?.let(onLaunch) })
+        addView(key("ANNOUNCE", Glass.VIOLET) { onIntercom() })
         addView(g.spacer(context, w = 10))
         addView(key("ALL OFF", Glass.RED) { allOff() })
     }
