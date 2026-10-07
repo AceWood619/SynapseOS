@@ -10,12 +10,9 @@ _Last updated: 2026-10-07 06:22 PDT (HANDS)_
 - **Known pain:** must tap Power within 5 s each boot; ADB TCP resets on reboot; USB adb/fastboot only through `tools/pc` (WinUSB/Zadig).
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 14:00 UTC (BRAIN). Mason is asleep; working autonomously._
-- **Done since last update:**
-  - **v0.2:** companion apps (Ava voice) allowed through kiosk and opened after boot.
-  - **v0.3:** BLE presence (known MACs + iBeacons → `ble_known`/`ble_devices` + occupancy) and camera snapshots (`/api/snapshot`, HA Generic Camera). 23 unit tests.
-  - WebView renderer-crash recovery.
-  - CRLF fix (`.gitattributes` + payload installer strips CR).
-  - `tools/pc/next_steps.ps1`: one-command run of R-006 + R-005 for Mason.
-- **Waiting on HANDS:** R-008 (autonomous overnight run, **no reboots**). HANDS hit its usage limit at 06:45 PT; it resets 07:20 PT. It needs a nudge to start: BRAIN was not allowed to schedule one, so Mason or BRAIN's next turn does it.
-- **Needs Mason (reboots: Power tap within 5 s):** R-003 (escape hatch test), R-007 (v6 reflash).
+_Last updated: 2026-10-07 14:15 UTC (BRAIN). Mason asleep; working autonomously on code (no phone needed)._
+- **Latest APK: builds/ = 0.3.10, verified fresh.** (CI publish bug fixed — it was stuck at 0.1.5 for 4 runs.)
+- **Since last update:** fixed CI publish (stale APK); extracted NodePublisher (testable); added end-to-end evening simulation (25 tests, all green).
+- **Waiting on HANDS:** R-008 overnight run (resumes ~07:20 PT). **No reboots** (dm-verity Power tap). R-003/R-007 wait for Mason.
+- **Boot Power-tap:** researched; BRAIN will NOT modify the bootloader (brick risk). Non-invasive options for Mason instead: SwitchBot presser, or an optocoupler+ESP32 on the power key (ESPHome), or just rely on the battery-as-UPS + an HA "panel offline" alert. BRAIN can write the ESPHome/HA config on request.
+- **Next idle work:** HA dashboard YAML example for the panel; a second-node (kitchen) config; Wyoming/Ava doc; more simulation scenarios.
