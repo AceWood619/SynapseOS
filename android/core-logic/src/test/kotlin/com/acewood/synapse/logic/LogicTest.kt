@@ -761,3 +761,21 @@ class RoomPadV3Test {
         assertTrue(model.extras.any { it.name == "Ceiling" })
     }
 }
+
+class NowPlayingTest {
+    @Test fun extractsAlbumArtTransportAndVolume() {
+        val state = NowPlaying.from(Entity("media_player.tv", "playing", mapOf(
+            "friendly_name" to "Living Room TV",
+            "media_title" to "The Matrix",
+            "app_name" to "Netflix",
+            "entity_picture" to "/api/media_player_proxy/media_player.tv",
+            "volume_level" to 0.42,
+            "supported_features" to (16384.0 + 32 + 4))))
+        assertEquals("The Matrix", state.title)
+        assertEquals("Netflix", state.appName)
+        assertEquals("/api/media_player_proxy/media_player.tv", state.albumArt)
+        assertEquals(42, state.volumePct)
+        assertTrue(state.canTransport)
+        assertTrue(state.isActive)
+    }
+}

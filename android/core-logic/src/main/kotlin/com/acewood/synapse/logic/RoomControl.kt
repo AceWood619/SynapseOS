@@ -27,6 +27,8 @@ object RoomControl {
         val volumePct: Int?,          // 0..100; null if volume not settable/known
         val canTransport: Boolean,    // supports play/pause/skip
         val showDpad: Boolean,        // Roku-style: show the directional pad
+        val albumArt: String? = null,
+        val appName: String? = null,
     )
 
     data class ToggleTile(val entityId: String, val name: String, val isOn: Boolean, val available: Boolean)
@@ -173,6 +175,8 @@ object RoomControl {
             volumePct = if (has(feat, FEAT_VOLUME_SET) || has(feat, FEAT_VOLUME_STEP)) vol else null,
             canTransport = has(feat, FEAT_PLAY) || has(feat, FEAT_PAUSE) || has(feat, FEAT_NEXT),
             showDpad = roku || room.remotes.isNotEmpty(),
+            albumArt = e?.attributes?.get("entity_picture") as? String,
+            appName = e?.attributes?.get("app_name") as? String,
         )
     }
 

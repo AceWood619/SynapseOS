@@ -11,6 +11,7 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -231,8 +232,18 @@ class RoomPadView(
     private fun mediaStrip(t: RoomControl.MediaTile): View = g.col(context).apply {
         background = g.panel(context, 18f)
         setPadding(g.dp(context, 15f), g.dp(context, 14f), g.dp(context, 15f), g.dp(context, 14f))
-        addView(tv(14f, Glass.INK, g.body(context)).apply { text = t.title; setTypeface(typeface, Typeface.BOLD); maxLines = 1 })
-        addView(tv(11f, if (t.isPlaying) Glass.MINT else Glass.INK_FAINT, g.body(context)).apply { text = t.state })
+        addView(g.row(context).apply {
+            val art = ImageView(context).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP; background = g.tile(context, Glass.VIOLET, false, 10f)
+                layoutParams = LinearLayout.LayoutParams(g.dp(context, 48f), g.dp(context, 48f)).apply { rightMargin = g.dp(context, 10f) }
+            }
+            AlbumArtLoader.load(art, t.albumArt)
+            addView(art)
+            addView(g.col(context).apply {
+                addView(tv(14f, Glass.INK, g.body(context)).apply { text = t.title; setTypeface(typeface, Typeface.BOLD); maxLines = 1 })
+                addView(tv(11f, if (t.isPlaying) Glass.MINT else Glass.INK_FAINT, g.body(context)).apply { text = t.appName ?: t.state })
+            })
+        })
         if (t.canTransport) {
             addView(g.spacer(context, h = 12))
             addView(g.row(context).apply {
@@ -254,7 +265,11 @@ class RoomPadView(
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             })
         }
-        if (t.showDpad) { addView(g.spacer(context, h = 14)); addView(dpad(t)) }
+        if (t.showDpad) {
+            addView(g.spacer(context, h = 10))
+            addView(tv(11f, Glass.BLUE, g.disp(context)).apply { text = "TV REMOTE"; gravity = Gravity.CENTER })
+            addView(g.spacer(context, h = 4)); addView(dpad(t))
+        }
     }
 
     // ---------- bigger Roku D-pad ----------

@@ -9,16 +9,20 @@ import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextClock
 import android.widget.TextView
 import com.acewood.synapse.logic.Entity
 import com.acewood.synapse.logic.EntityCache
 import com.acewood.synapse.logic.NodeConfig
+import com.acewood.synapse.logic.NowPlaying
 import com.acewood.synapse.logic.Profile
 import com.acewood.synapse.logic.Room
 import com.acewood.synapse.logic.RoomOrder
+import com.acewood.synapse.logic.MediaRemote
 import java.util.Calendar
 
 /**
@@ -68,6 +72,7 @@ class HomeView(
     private val greeting = tv(23f, Glass.INK, g.disp(context))
     private val summary = tv(12.5f, Glass.INK_DIM, g.light(context))
     private val nowPlaying = tv(12f, Glass.MINT, g.body(context)).apply { maxLines = 1; visibility = View.GONE }
+    private val nowPlayingCard = g.col(context).apply { visibility = View.GONE }
     private val weatherChip = tv(12f, Glass.AMBER, g.disp(context)).apply { visibility = View.GONE }
     private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val modesWrap = g.col(context)
@@ -189,7 +194,7 @@ class HomeView(
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Glass.BLUE, Glass.INDIGO)).apply { shape = GradientDrawable.OVAL }
             val s = g.dp(context, 56f); layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 14f) }
         })
-        addView(g.col(context).apply { addView(greeting); addView(summary); addView(nowPlaying) },
+        addView(g.col(context).apply { addView(greeting); addView(summary); addView(nowPlaying); addView(nowPlayingCard) },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
@@ -250,7 +255,7 @@ class HomeView(
         append(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)).append(HaRepository.connected).append(HaRepository.rooms.size)
         if (cache == null) return@buildString
         cache.byDomain("light").forEach { append(it.entityId).append(it.state) }
-        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]) }
+        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]).append(it.attributes["entity_picture"]).append(it.attributes["volume_level"]) }
         cache.byDomain("scene").forEach { append(it.entityId) }
         cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
         modes.forEach { append(cache.get(it.first)?.state) }
@@ -276,11 +281,64 @@ class HomeView(
     }
 
     private fun bindNowPlaying(cache: EntityCache?) {
-        val p = cache?.byDomain("media_player")?.firstOrNull { it.state == "playing" }
-        if (p == null) { nowPlaying.visibility = View.GONE; return }
-        val what = (p.attributes["media_title"] as? String)?.takeIf { it.isNotBlank() } ?: (p.attributes["app_name"] as? String) ?: "Playing"
-        nowPlaying.text = "▶  $what  ·  ${p.friendlyName.replace(Regex("(?i)\\s*50 onn roku tv"), " TV")}"
+        val p = NowPlaying.first(cache)
+        if (p == null) { nowPlaying.visibility = View.GONE; nowPlayingCard.visibility = View.GONE; return }
+        nowPlaying.text = "▶  ${p.title}  ·  ${cache?.get(p.entityId)?.friendlyName ?: "Media"}"
         nowPlaying.visibility = View.VISIBLE
+        nowPlayingCard.removeAllViews()
+        nowPlayingCard.background = g.panel(context, 16f)
+        nowPlayingCard.setPadding(g.dp(context, 10f), g.dp(context, 9f), g.dp(context, 10f), g.dp(context, 9f))
+        val art = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = g.tile(context, Glass.VIOLET, false, 12f)
+            layoutParams = LinearLayout.LayoutParams(g.dp(context, 58f), g.dp(context, 58f)).apply { rightMargin = g.dp(context, 10f) }
+        }
+        AlbumArtLoader.load(art, p.albumArt)
+        nowPlayingCard.addView(g.row(context).apply {
+            addView(art)
+            addView(g.col(context).apply {
+                addView(tv(13f, Glass.INK, g.body(context)).apply { text = p.title; maxLines = 1 })
+                addView(tv(10.5f, Glass.INK_DIM, g.body(context)).apply { text = p.appName ?: cache?.get(p.entityId)?.friendlyName ?: "Media"; maxLines = 1 })
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        })
+        nowPlayingCard.addView(g.row(context).apply {
+            gravity = Gravity.CENTER
+            addView(nowKey("⏮") { sendMedia(MediaRemote.previous(p.entityId)) })
+            addView(nowKey(if (p.isPlaying) "⏸" else "▶", Glass.MINT) { sendMedia(MediaRemote.playPause(p.entityId)) })
+            addView(nowKey("⏭") { sendMedia(MediaRemote.next(p.entityId)) })
+        })
+        p.volumePct?.let { volume ->
+            nowPlayingCard.addView(g.row(context).apply {
+                addView(tv(10f, Glass.INK_FAINT, g.disp(context)).apply { text = "VOL" })
+                addView(SeekBar(context).apply {
+                    max = 100; progress = volume; layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(s: SeekBar, value: Int, fromUser: Boolean) {}
+                        override fun onStartTrackingTouch(s: SeekBar) {}
+                        override fun onStopTrackingTouch(s: SeekBar) {
+                            HaRepository.optimisticAttribute(listOf(p.entityId), "volume_level", s.progress / 100.0)
+                            HaRepository.callService("media_player", "volume_set", listOf(p.entityId), mapOf("volume_level" to s.progress / 100.0))
+                        }
+                    })
+                })
+            })
+        }
+        HaRepository.rooms.firstOrNull { it.media.contains(p.entityId) }?.let { room ->
+            nowPlayingCard.addView(tv(11f, Glass.BLUE, g.disp(context)).apply {
+                text = "TV REMOTE  ·  ${room.name}"; gravity = Gravity.CENTER
+                setPadding(0, g.dp(context, 7f), 0, g.dp(context, 3f)); tap { onOpenRoom(room) }
+            })
+        }
+        nowPlayingCard.visibility = View.VISIBLE
+    }
+
+    private fun nowKey(label: String, accent: Int = Glass.INK_DIM, action: () -> Unit): View =
+        tv(13f, accent, g.disp(context)).apply {
+            text = label; gravity = Gravity.CENTER; setPadding(g.dp(context, 13f), g.dp(context, 7f), g.dp(context, 13f), g.dp(context, 7f)); tap { action() }
+        }
+
+    private fun sendMedia(call: com.acewood.synapse.logic.HaCall) {
+        HaRepository.callService(call.domain, call.service, listOf(call.entityId), call.data)
     }
 
     private fun bindWeather(cache: EntityCache?) {

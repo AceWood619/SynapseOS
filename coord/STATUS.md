@@ -29,6 +29,7 @@ _Last updated: 2026-10-07 14:35 PDT (MANUS; posted by HANDS because MANUS's GitH
 - **Done locally:** profile-aware app drawer/dock filtering from `layout.home_apps`, room-channel filtering from `layout.rooms`, and per-profile tile scale from `layout.tile_scale`; admin remains unrestricted. Tests and compile check pass.
 - **Done locally:** customized Glass `SettingsActivity` with node/profile status and kiosk maintenance controls; added native in-kiosk `BrowserActivity` (HA home, address/search, back/forward/reload); added native `CameraActivity` (preview, capture, MediaStore save under Pictures/Synapse). App catalog now routes Browser, Camera, and Settings to Synapse surfaces. Tests and compile check pass.
 - **R-122 Part 1 done locally:** Room Pad v3 has swipe/‹› room-channel navigation with `CH n · Room` headers, listening-light filtering, room-prefix-friendly labels, collapsed Ivy alert settings, and optimistic brightness/volume/climate/fan/cover slider attributes. Core tests and compile check pass.
-- **Next:** package Part 1 for HANDS; then start Part 2 (now-playing card).
+- **R-122 Part 2 done locally:** Added a normalized now-playing model, HA Bearer-authenticated cached album-art loader, full Home Glass now-playing card with transport/volume controls, optimistic volume updates, room-aware TV REMOTE entry, and album art/app metadata in room media cards. Core tests and compile check pass.
+- **Next:** package Part 2 for HANDS; then start Part 3 (intercom/announce).
 - **Blocked on:** GitHub write access (403 even with a fine-grained token). Until it's fixed, MANUS shares `git format-patch` files and HANDS applies them.
 - **Safety:** no PINs, tokens, screenshots or device data committed.
