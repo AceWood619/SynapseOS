@@ -37,6 +37,8 @@ import android.widget.Toast
 import com.acewood.synapse.logic.IdleController
 import com.acewood.synapse.logic.Json
 import com.acewood.synapse.logic.NodeConfig
+import com.acewood.synapse.logic.Profile
+import com.acewood.synapse.logic.Profiles
 import kotlin.random.Random
 
 /**
@@ -54,6 +56,9 @@ class MainActivity : Activity() {
     private var sensorsView: SensorsView? = null
     private var jarvisView: JarvisView? = null
     private var drawerView: AppDrawerView? = null
+    private var profileLock: ProfileLockView? = null
+    private var profiles: Profiles? = null
+    private var activeProfile: Profile? = null
     /** Coalesces HA updates: at most one UI refresh per 350 ms, however chatty the house is. */
     private var refreshQueued = false
     private val haListener: () -> Unit = {
@@ -383,6 +388,12 @@ class MainActivity : Activity() {
             return
         }
         setup.visibility = View.GONE
+        profiles = ProfileStore.loadOrCreate(this, c)
+        // Mason's remote rule: remember the last profile (no "who are you?" after every reboot/update).
+        if (activeProfile == null) {
+            val last = ProfileStore.lastProfileId(this)
+            activeProfile = profiles?.list?.firstOrNull { it.id == last }
+        }
         idle.idleMs = c.idleSeconds * 1000L
         // Native Glass home (default). HA Lovelace stays loaded underneath as the "HA" tab.
         if (home == null) {
@@ -393,7 +404,8 @@ class MainActivity : Activity() {
                 onHa = { showHa() },
                 onApps = { showOverlay(drawerView) { it.open() } },
                 onSensors = { showOverlay(sensorsView) { it.open() } },
-                onLaunch = { app -> launchApp(app) }).also { h ->
+                onLaunch = { app -> launchApp(app) },
+                onSwitchProfile = { switchProfile() }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
@@ -434,8 +446,9 @@ class MainActivity : Activity() {
                 })
             }
         }
+        applyProfileToHome()
         home?.refresh()
-        showHome()
+        if (profiles != null && activeProfile == null) showProfileLock() else showHome()
         hideSplash()
         val url = c.dashboardUrl + (if (c.dashboardUrl.contains('?')) "&" else "?") + "external_auth=1"
         haPathLoaded = null
@@ -443,11 +456,42 @@ class MainActivity : Activity() {
         applyMode()
     }
 
+    /** Tap the profile badge: forget the current profile and show the picker. */
+    private fun switchProfile() {
+        if (profiles == null) return
+        activeProfile = null; ProfileStore.rememberProfile(this, null); showProfileLock()
+    }
+
+    private fun applyProfileToHome() {
+        val p = activeProfile ?: return
+        home?.setProfile(p.name, p.role.name.lowercase())
+    }
+
+    private fun showProfileLock() {
+        val ps = profiles ?: return showHome()
+        if (profileLock == null) {
+            profileLock = ProfileLockView(this, ps) { profile ->
+                activeProfile = profile
+                ProfileStore.rememberProfile(this, profile.id)
+                applyProfileToHome()
+                profileLock?.visibility = View.GONE
+                showHome()
+            }.also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
+        }
+        hideOverlays()
+        web.visibility = View.GONE
+        home?.visibility = View.GONE
+        profileLock?.visibility = View.VISIBLE
+        profileLock?.bringToFront()
+    }
+
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
         jarvisView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
-    private fun showHome() { hideOverlays(); home?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
+    private fun showHome() {
+        if (profiles != null && activeProfile == null) { showProfileLock(); return }
+        hideOverlays(); home?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
         haHomeChip?.visibility = View.GONE
         ambient.bringToFront(); splash.bringToFront() }
     /** Show one full-screen Synapse overlay (sensors, Jarvis, app drawer) over the home screen. */

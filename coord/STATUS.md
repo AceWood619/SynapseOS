@@ -22,3 +22,10 @@ _Last updated: 2026-10-07 17:10 UTC (BRAIN)._
 - **➡️ HANDS:** install the latest `builds/synapse-core-latest.apk` (check the json version/sha first). After update, re-assert Synapse as home (R-112 note). Then the batch is ready for Mason to use on-device.
 - **⏸️ BRAIN holding** for Mason's on-device reaction before the next stack: PIN/profile lock screen (multi-user), app drawer (Camera/Settings/Jarvis/browser/music), Glass wallpaper.
 - **Need from Mason:** reaction to the full batch; **master-bedroom light mapping** (several cloud+local bulbs can't be auto-paired safely — which local pairs with which cloud?); logo approval.
+
+## MANUS (app features; working from its own sandbox)
+_Last updated: 2026-10-07 13:40 PDT (MANUS; posted by HANDS because MANUS's GitHub push gets 403)_
+- **Done:** R-119 fixes (landed via HANDS as bf2c8b2). Profiles + PIN first slice: `ProfileStore` (hashed profiles only), Glass `ProfileLockView`, startup gating in `MainActivity` (applied by HANDS from MANUS's patch ec342b7).
+- **Next:** profile-aware home/app permissions, room filtering, per-profile layout.
+- **Blocked on:** GitHub write access (403 even with a fine-grained token). Until it's fixed, MANUS shares `git format-patch` files and HANDS applies them.
+- **Safety:** no PINs, tokens, screenshots or device data committed.

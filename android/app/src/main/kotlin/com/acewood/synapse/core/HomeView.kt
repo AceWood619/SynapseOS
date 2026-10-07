@@ -38,7 +38,19 @@ class HomeView(
     private val onApps: () -> Unit = {},
     private val onSensors: () -> Unit = {},
     private val onLaunch: (AppCatalog.App) -> Unit = {},
+    private val onSwitchProfile: () -> Unit = {},
 ) : FrameLayout(context) {
+    private val pillInitial = TextView(context)
+    private val pillRole = TextView(context)
+    private var profileName: String = cfg.ownerName.trim()
+
+    /** Show who's using the remote (initial + role) and greet them by name. */
+    fun setProfile(name: String, role: String) {
+        profileName = name.trim()
+        pillInitial.text = (profileName.firstOrNull() ?: 'S').uppercaseChar().toString()
+        pillRole.text = role.uppercase()
+        lastSig = null; refresh()
+    }
 
     private val g = Glass
     private val greeting = tv(23f, Glass.INK, g.disp(context))
@@ -147,13 +159,14 @@ class HomeView(
         setPadding(g.dp(context, 5f), g.dp(context, 4f), g.dp(context, 11f), g.dp(context, 4f))
         layoutParams = LinearLayout.LayoutParams(-2, -2).apply { leftMargin = g.dp(context, 10f) }
         val initial = (cfg.ownerName.trim().firstOrNull() ?: 'S').uppercaseChar()
-        addView(TextView(context).apply {
+        addView(pillInitial.apply {
             text = initial.toString(); textSize = 10f; setTextColor(Color.parseColor("#04101f")); typeface = g.disp(context)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Glass.BLUE) }
             val s = g.dp(context, 20f); layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 7f) }
         })
-        addView(tv(11f, Glass.INK, g.body(context)).apply { text = "ADMIN"; letterSpacing = 0.1f })
+        addView(pillRole.apply { text = "ADMIN"; textSize = 11f; setTextColor(Glass.INK); typeface = g.body(context); letterSpacing = 0.1f })
+        tap { onSwitchProfile() }
     }
 
     private fun hero(): View = g.row(context).apply {
@@ -235,7 +248,7 @@ class HomeView(
     private fun greetingText(): String {
         val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val part = when { h < 5 -> "Good night"; h < 12 -> "Good morning"; h < 18 -> "Good afternoon"; else -> "Good evening" }
-        val who = cfg.ownerName.trim()
+        val who = profileName
         return if (who.isNotEmpty()) "$part, $who" else part
     }
 
