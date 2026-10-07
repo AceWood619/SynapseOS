@@ -511,6 +511,8 @@ class MainActivity : Activity() {
                     "sensors" -> showOverlay(sensorsView) { it.open() }
                     "ha" -> showHa()
                     "music" -> showHa("/media-browser/browser")
+                    "browser" -> startActivity(Intent(this, BrowserActivity::class.java))
+                    "camera" -> startActivity(Intent(this, CameraActivity::class.java))
                     "settings" -> openSettings()
                 }
                 is AppCatalog.Target.Pkg -> {

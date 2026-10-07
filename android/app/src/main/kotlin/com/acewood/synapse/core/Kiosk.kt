@@ -52,6 +52,11 @@ object Kiosk {
                 a, ctx.packageName, android.Manifest.permission.POST_NOTIFICATIONS,
                 DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
             )
+            // Synapse Camera: the system permission dialog can't appear inside lock task, so grant as device owner.
+            dpm.setPermissionGrantState(
+                a, ctx.packageName, android.Manifest.permission.CAMERA,
+                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+            )
         } catch (e: Exception) {
             Log.w(SynapseApp.TAG, "applyPolicies failed", e)
         }

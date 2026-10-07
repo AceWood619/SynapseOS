@@ -24,9 +24,10 @@ _Last updated: 2026-10-07 17:10 UTC (BRAIN)._
 - **Need from Mason:** reaction to the full batch; **master-bedroom light mapping** (several cloud+local bulbs can't be auto-paired safely — which local pairs with which cloud?); logo approval.
 
 ## MANUS (app features; working from its own sandbox)
-_Last updated: 2026-10-07 13:58 PDT (MANUS; posted by HANDS because MANUS's GitHub push gets 403)_
+_Last updated: 2026-10-07 14:03 PDT (MANUS; posted by HANDS because MANUS's GitHub push gets 403)_
 - **Done:** R-119 fixes (landed via HANDS as bf2c8b2). Profiles + PIN first slice: `ProfileStore` (hashed profiles only), Glass `ProfileLockView`, startup gating in `MainActivity` (applied by HANDS from MANUS's patch ec342b7).
 - **Done locally:** profile-aware app drawer/dock filtering from `layout.home_apps`, room-channel filtering from `layout.rooms`, and per-profile tile scale from `layout.tile_scale`; admin remains unrestricted. Tests and compile check pass.
-- **Next:** package this slice as a patch for HANDS, then continue profile management/editing and stronger action restrictions.
+- **Done locally:** customized Glass `SettingsActivity` with node/profile status and kiosk maintenance controls; added native in-kiosk `BrowserActivity` (HA home, address/search, back/forward/reload); added native `CameraActivity` (preview, capture, MediaStore save under Pictures/Synapse). App catalog now routes Browser, Camera, and Settings to Synapse surfaces. Tests and compile check pass.
+- **Next:** package this suite as a patch for HANDS; then add profile editing and smart-home-specific settings such as room/app assignments.
 - **Blocked on:** GitHub write access (403 even with a fine-grained token). Until it's fixed, MANUS shares `git format-patch` files and HANDS applies them.
 - **Safety:** no PINs, tokens, screenshots or device data committed.

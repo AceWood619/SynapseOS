@@ -26,8 +26,6 @@ object AppCatalog {
 
     /** Android apps the kiosk lets through. Order = dock/drawer order. Missing ones are skipped. */
     val ANDROID_APPS = listOf(
-        App("Camera", "◎", Target.Pkg("org.lineageos.aperture")),
-        App("Browser", "◍", Target.Pkg("org.lineageos.jelly")),
         App("Clock", "◷", Target.Pkg("com.android.deskclock")),
         App("Calendar", "▦", Target.Pkg("org.lineageos.etar")),
         App("Calculator", "±", Target.Pkg("com.android.calculator2")),
@@ -42,11 +40,13 @@ object AppCatalog {
         App("Sensors", "≋", Target.Internal("sensors")),
         App("Home Assistant", "⌂", Target.Internal("ha")),
         App("Music", "♫", Target.Internal("music")),
+        App("Synapse Browser", "◍", Target.Internal("browser")),
+        App("Synapse Camera", "◎", Target.Internal("camera")),
         App("Synapse settings", "⚙", Target.Internal("settings"), adminOnly = true),
     )
 
     /** The dock on the home screen (first row). */
-    val DOCK_IDS = listOf("jarvis", "org.lineageos.aperture", "sensors", "music", "com.android.deskclock", "org.lineageos.jelly")
+    val DOCK_IDS = listOf("jarvis", "camera", "sensors", "music", "browser", "com.android.deskclock")
 
     fun key(a: App) = when (val t = a.target) { is Target.Pkg -> t.pkg; is Target.Internal -> t.id }
 

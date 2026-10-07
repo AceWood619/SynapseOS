@@ -64,6 +64,20 @@
             android:lockTaskMode="if_whitelisted"
             android:theme="@android:style/Theme.DeviceDefault" />
 
+        <activity
+            android:name=".BrowserActivity"
+            android:exported="false"
+            android:lockTaskMode="if_whitelisted"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+
+        <activity
+            android:name=".CameraActivity"
+            android:exported="false"
+            android:lockTaskMode="if_whitelisted"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+
         <service
             android:name=".NodeService"
             android:exported="false"
