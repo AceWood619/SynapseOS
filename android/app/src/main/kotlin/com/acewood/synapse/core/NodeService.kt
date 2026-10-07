@@ -56,6 +56,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
     private var bleTracker: BleTracker? = null
     private var ble: BleScanner? = null
     private var camera: Snapshotter? = null
+    private var haWs: HaWsClient? = null
     private val startedMs = SystemClock.elapsedRealtime()
 
     // Latest readings (written on the sensor/receiver threads, read on the node thread).
@@ -109,6 +110,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         NodeBus.removeEvent(busEvents)
         NodeBus.removeCommand(busCommands)
         server?.stop()
+        haWs?.stop()
         ble?.stop()
         camera?.shutdown()
         speech?.shutdown()
@@ -129,6 +131,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         server?.stop(); server = null
         ble?.stop(); ble = null; bleTracker = null
         camera?.shutdown(); camera = null
+        haWs?.stop(); haWs = null
         if (c == null) {
             ha = null
             goForeground("Not configured — waiting for config.json")
@@ -146,6 +149,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
             ble = BleScanner(this, t).also { it.start() }
         }
         if (c.camera.isNotEmpty()) camera = Snapshotter(this, c.camera)
+        haWs = HaWsClient(c).also { it.start() }
         goForeground("${c.nodeId} · ${c.room}")
     }
 
@@ -355,6 +359,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
             "ble" to ble?.let { b -> mapOf("running" to b.running, "error" to b.lastError, "adverts" to b.adverts,
                 "known" to bleTracker?.snapshot(t)?.known?.map { mapOf("name" to it.name, "rssi" to it.rssi, "near" to it.near) }) },
             "camera" to camera?.let { cam -> mapOf("facing" to c?.camera, "permitted" to cam.permitted(), "last_error" to cam.lastError, "size" to cam.lastSize) },
+            "ha_ws" to haWs?.let { mapOf("connected" to it.connected, "entities" to it.cache.size(), "last_error" to it.lastError) },
             "uptime_s" to (t - startedMs) / 1000,
         )
     }

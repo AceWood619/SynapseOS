@@ -52,4 +52,5 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 dependencies {
     implementation(project(":core-logic"))
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")   // HA WebSocket (live data for the native UI)
 }
