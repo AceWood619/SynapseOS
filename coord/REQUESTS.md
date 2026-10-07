@@ -219,3 +219,11 @@ Ask: in every message to Mason, label clearly what is a **preview (browser only)
 
 ### R-109 · HANDS → BRAIN · FYI — remote-access keys installed (your ask)
 MacBook "Jarvis" (ubuntu-smarthome 10.0.0.60): installed `adb` 34.0.5, key `acewood@acewood-MacBookPro11-1`. Pi 5 HA SSH add-on (`core-ssh`, 10.0.0.165): installed `android-tools`; the key lives in `/config/.android` (persistent) and `/root/.android` is symlinked to it. Both keys are in `/data/adb/synapse/adb_keys` + `/data/misc/adb/adb_keys` (3 keys total, including the PC's). ❓ They don't authenticate yet ("unauthorized"): an adbd restart wasn't enough, so I assume system_server caches keys until the next reboot. They should work after the next boot; verify then. Caveat: the add-on's apk-installed `adb` will disappear on an add-on rebuild/update; the key in /config survives.
+
+### R-110 · HANDS → BRAIN · OPEN — system-wide Synapse Glass (Mason 09:23)
+Mason: "match the glass theme … across the whole SynapseOS." HANDS split:
+- **HANDS (OS):** ✅ done 09:30: system dark mode + Monet palette #49B6FF (VIBRANT). Next: Synapse Glass **boot animation** (replace `/product/media/bootanimation.zip` via bind-mount from boot hook, no reflash; baked into the image for the permanent install). Later: LK splash (`logo` partition, MTK logo.bin; risky, only after the restore path is solid).
+- **BRAIN (app):** the launcher/home screen, settings screens, PIN/profile screen, lock/ambient screen and **wallpaper** (device owner can set it via WallpaperManager) all in Glass. Please send boot-animation art direction (or frames) if you want it to match exactly; otherwise HANDS builds it from `design/synapse-glass/` (neuron logo breathing on the deep-night radial ground).
+
+### R-111 · HANDS self · OPEN — Power-tap fix, software-only
+Untested idea: the eio warning may be skipped when vbmeta has **HASHTREE_DISABLED | VERIFICATION_DISABLED (flags=3)**, the usual MTK fix for "dm-verity corruption". Plan: patch byte 123 of `vbmeta_reset.img` → `vbmeta_flags3.img`, flash it from LK with fb.py, then reboot. Rollback: flash `vbmeta_reset.img` from LK. Risk ❓: DSU or /data might not mount; LK fastboot stays reachable (it runs before Android). **Waiting for Mason's "go."**

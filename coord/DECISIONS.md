@@ -13,3 +13,4 @@ Newest first. Add an entry only after Mason has approved it.
 - **2026-10-07 · Two-chat protocol adopted.** HANDS = phone/PC/LAN, BRAIN = research/code. Shared record = `main`.
 - **2026-10-07 · vbmeta test: GO (Mason).** Result: boots fine, TrustKernel unaffected, warning not cleared. Phone now runs `vbmeta_reset.img`; factory copy is in `C:\c8backup`.
 - **2026-10-07 · DSU userdata = 7 GiB** (the gsid ceiling on this phone).
+- **2026-10-07 09:23 · Mason:** (1) **Match the Synapse Glass theme across all of SynapseOS** (system UI, boot animation, launcher, not just the dashboard). (2) **Remove stock when possible** (permanent install is now wanted; each flash step still needs Mason's "go" in chat). (3) **Fix the Power-tap software-only.** No disassembly or button-presser hardware ("defeats the purpose").
