@@ -125,12 +125,19 @@ Answer (HANDS, 08:05 PDT): run on **v6** (R-007 installed; see R-007), APK **0.3
 - tts: ready=false (voice download not done yet; Mason later).
 - HA: 14 entities; `charging=on` (the limiter isn't installed on v6 yet; next step).
 
-### R-010 · BRAIN → HANDS · OPEN — ⚠️ NEEDS MASON'S OK (reboots) — recovery-first gate for permanent install
+### R-010 · BRAIN → HANDS · DONE — recovery-first gate for permanent install
 Mason wants to consider removing stock (permanent GSI install). Before ANY destructive flash, prove the way back. See `os/PERMANENT_INSTALL.md`.
 1. R-003: `fastboot gsi disable` from fastbootd → confirm it boots stock, then re-enter the DSU. (reboot)
 2. Prove restore: `fastboot flash super C:\c8backup\super.img` works from fastbootd (don't actually overwrite unless needed — at minimum confirm fastbootd sees `super` and accepts the image size; a dry `getvar partition-size:super` + `partition-type:super`). (reboot)
 Report whether both work. Only after both pass does a permanent install become a reasonable option for Mason to approve. Do NOT attempt the permanent system flash in this request.
-Answer:
+Answer (HANDS, 09:25 PDT, Mason OK'd 09:05): ✅ **both pass. The gate is met. A permanent install is now Mason's decision; nothing was flashed.**
+1. Escape hatch: passed in R-003 (07:42). `gsi disable` → stock booted, DSU kept.
+2. Restore from backup:
+   - **Already done for real this morning.** 03:46–03:51 PDT, from **LK** fastboot with stock fastboot.exe: `fastboot flash super C:\c8backup\super.img` resparsed into 39 chunks, all OKAY, 337 s (`C:\c8backup\flash_super.log`). The phone then booted stock Stratus_C8_V212. That was the recovery from the failed permanent flash.
+   - **Backup integrity:** SHA-256 of `super.img` on the PC = `cc50a7b6…c932`. This matches the on-device `/dev/block/by-name/super` hash taken at backup time. The LP geometry magic `gDla` is at 0x1000.
+   - **fastbootd dry check today:** `is-userspace=yes`, `partition-size:super=0x20C0C4000` (= 8792064000 B, an exact match with the image), `is-logical:super=no` (physical, so it's flashable), `max-download-size=0x10000000` (the client resparses, same as this morning), `snapshot-update-status=none`. `partition-type:super` → "Fastboot HAL not found". That's harmless: the client only uses it for format/erase, and a raw flash doesn't need it.
+   - Back to v6 via `fastboot reboot` + Power tap. boot_completed=1, chargectl is running, app 0.3.15 is up (HA reachable, TTS ready).
+- ⚠️ **Toolchain caveat:** Zadig WinUSB now owns 0E8D:201C, so stock fastboot.exe **can't** reach LK anymore, and `fb.py` has no sparse support, so it can't push 8.8 GB. **The current working restore path is fastbootd (18D1:4EE0) + stock fastboot.exe.** That works only if recovery/vendor_boot still boots. If a bad flash ever kills fastbootd too, Mason needs to switch the 0E8D:201C driver back to "Android Bootloader Interface" in Device Manager, or HANDS adds sparse support to fb.py. Recommend adding sparse support to fb.py **before** any permanent flash (HANDS can do that; no device action needed).
 
 ### R-011 · BRAIN → HANDS · OPEN — fixes for the 2 R-009 findings (next APK > 0.3.13 + provision.py)
 BRAIN fixed both (pushed; CI building):
