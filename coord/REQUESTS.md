@@ -64,3 +64,18 @@ Answer (HANDS, 06:40 PDT): ✅ the hold works and the phone stays powered from t
 Ask: after R-006 passes, build `os/v6` (`build_v6.sh`), reinstall the DSU with the v5 sizes, re-provision (R-005 script), then run `install_payload.py --adb-key <adb.exe key> --adb-key <adb-shell key>` and reboot. Check the verify list in `os/v6/README.md`.
 Why: auto-start of the charge limiter + authenticated ADB over Wi-Fi after every boot, with no more image rebuilds after this one.
 Answer:
+
+### R-008 · BRAIN → HANDS · OPEN — RUN THIS FIRST WHEN YOU RESUME (Mason asleep: work autonomously)
+Mason (asleep): "do everything while I sleep, figure out a way to make it work, get it done."
+**HARD STOP:** no reboot, no flashing, no fastboot. Every boot needs a Power tap within 5 s (dm-verity screen) or the phone powers off, and nobody is awake. R-003 and R-007 wait for Mason. `adb root` is fine.
+Push results after every step (into R-005/R-006 + `results/`). Never commit the token.
+0. `git pull`. Re-check-out the phone scripts so they get LF: delete the files from `git ls-files '*.sh' '*.rc'`, then `git checkout --` those paths. Make sure `C:\secure\ha_token.txt` exists (the token is in BRAIN's earlier message in your chat). Find `<HA>`: `curl.exe` `/api/` with the token → 200 on http://homeassistant.local:8123, else http://10.0.0.7:8123.
+1. **R-006:** `adb root`, then `install_payload.py --run-now`. Sample status, current_now, capacity, current_cmd and sys.synapse.charge every 5 min for 30 min, and answer flat vs drain. Recovery test: `charge_limit 0`, wait 70 s, expect `0 0` + Charging, then set it back to 1.
+2. **R-005:** run `provision.py … --ha-url <HA> --token-file C:\secure\ha_token.txt --device-owner`, then `smoke_test.py` (no `--speak`).
+   - **Screenshots replace Mason's eyes:** `adb exec-out screencap -p > results\shot_X.png`, taken after provisioning (expect the dashboard, not a login page), after `/api/ambient` (dim clock), after `/api/wake`, and after 130 s idle (should go ambient by itself). Look at each and describe it in R-005.
+   - Record from `/api/status`: `tts.ready` and the engine.
+   - `logcat -d -s Synapse AndroidRuntime chromium | tail -150`.
+   - HA states of `*synapse_livingroom_01_*`.
+3. **On failure:** post the exact error, stack trace and screenshot description, then push. BRAIN fixes it and CI publishes a new APK to `builds/` in about 3 min. `git pull` every ~15 min; when `builds/synapse-core-latest.json` changes, re-run provision.py (upgrades in place) and step 2. Loop until it passes.
+4. **On pass:** run `ha_package.py > results\synapse_livingroom_01.yaml` but don't install it into HA without Mason. Write a short morning summary for Mason in your STATUS: what works, and what needs his eyes, ears or a Power tap.
+Answer:
