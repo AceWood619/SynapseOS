@@ -6,14 +6,31 @@ import android.speech.tts.TextToSpeech
 import java.util.UUID
 
 /** Wraps the system TTS engine (SherpaTTS once installed). */
-class Speech(ctx: Context) {
+class Speech(private val appCtx: Context) {
     @Volatile var ready = false
         private set
-    private val tts: TextToSpeech = TextToSpeech(ctx.applicationContext) { status ->
+    @Volatile var lastStatus: Int = -99
+        private set
+    private var tts: TextToSpeech = newEngine()
+
+    private fun newEngine(): TextToSpeech = TextToSpeech(appCtx.applicationContext) { status ->
+        lastStatus = status
         ready = status == TextToSpeech.SUCCESS
+        if (ready) android.util.Log.i(SynapseApp.TAG, "TTS ready, engine=" + (try { tts.defaultEngine } catch (e: Exception) { "?" }))
+        else android.util.Log.w(SynapseApp.TAG, "TTS init failed status=$status")
     }
 
-    init {
+    /** Re-init if the engine never came up (e.g. voice installed after boot, or default changed). */
+    fun reinitIfNeeded() {
+        if (ready) return
+        try { tts.shutdown() } catch (_: Exception) {}
+        tts = newEngine()
+        applyAttrs()
+    }
+
+    init { applyAttrs() }
+
+    private fun applyAttrs() {
         tts.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANT)

@@ -53,7 +53,10 @@ def main():
     hook = sh("grep -c 'data/adb/synapse/boot.sh' /system/bin/phh-on-boot.sh")
     print(f"v6 boot hook in system image: {'YES' if hook.strip() == '1' else 'NO (v5 image: payload installed but will not auto-run)'}")
     if a.run_now:
-        print(sh(f"sh {D}/boot.sh; tail -n 15 {D}/boot.log"))
+        # boot.sh runs `ctl.restart adbd`, which would kill a foreground adb shell; detach it.
+        sh(f"setsid sh {D}/boot.sh </dev/null >/dev/null 2>&1 &")
+        import time as _t; _t.sleep(6)
+        print(sh(f"tail -n 15 {D}/boot.log"))
         print("charge state:", sh("getprop sys.synapse.charge"), "| current_cmd:", sh("cat /proc/mtk_battery_cmd/current_cmd"))
 
 

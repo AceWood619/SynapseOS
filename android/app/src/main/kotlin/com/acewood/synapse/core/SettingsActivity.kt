@@ -40,9 +40,17 @@ class SettingsActivity : Activity() {
             NodeBus.send(NodeBus.Command.RELOAD)
         }
         button("Leave kiosk → Android Settings") {
+            Kiosk.pauseKiosk()                          // stop MainActivity re-pinning
             Kiosk.relax(this)
+            Kiosk.applyPolicies(this)                   // re-publish lock-task list incl. com.android.settings
             try { stopLockTask() } catch (_: Exception) {}
-            startActivity(Intent(Settings.ACTION_SETTINGS))
+            startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        button("Return to kiosk") {
+            Kiosk.resumeKiosk()
+            Kiosk.applyPolicies(this)
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            finish()
         }
         button("Remove device owner (undo kiosk lockdown)") {
             if (Kiosk.isDeviceOwner(this)) {

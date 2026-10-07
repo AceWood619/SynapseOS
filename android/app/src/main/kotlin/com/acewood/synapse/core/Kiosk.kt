@@ -15,6 +15,12 @@ import android.util.Log
  * Without device owner the app still works as a normal launcher (no lockdown).
  */
 object Kiosk {
+    /** When set in the future, MainActivity won't re-pin lock-task (so "Leave kiosk" actually sticks). */
+    @Volatile var pausedUntilMs: Long = 0L
+    fun kioskPaused() = android.os.SystemClock.elapsedRealtime() < pausedUntilMs
+    fun pauseKiosk(ms: Long = 180_000) { pausedUntilMs = android.os.SystemClock.elapsedRealtime() + ms }
+    fun resumeKiosk() { pausedUntilMs = 0L }
+
     fun admin(ctx: Context) = ComponentName(ctx, AdminReceiver::class.java)
 
     fun isDeviceOwner(ctx: Context): Boolean =
@@ -27,7 +33,8 @@ object Kiosk {
         val a = admin(ctx)
         try {
             val companions = ConfigStore.load(ctx)?.companionApps.orEmpty()
-            dpm.setLockTaskPackages(a, (listOf(ctx.packageName) + companions).distinct().toTypedArray())
+            val extra = if (kioskPaused()) listOf("com.android.settings") else emptyList()
+            dpm.setLockTaskPackages(a, (listOf(ctx.packageName) + companions + extra).distinct().toTypedArray())
             // Keep the power menu so the phone can still be shut down by hand.
             dpm.setLockTaskFeatures(a, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
             val home = IntentFilter(Intent.ACTION_MAIN).apply {
@@ -49,6 +56,7 @@ object Kiosk {
     }
 
     fun enterLockTask(activity: Activity) {
+        if (kioskPaused()) return
         val dpm = activity.getSystemService(DevicePolicyManager::class.java)
         if (dpm.isLockTaskPermitted(activity.packageName)) {
             try { activity.startLockTask() } catch (e: Exception) { Log.w(SynapseApp.TAG, "startLockTask", e) }

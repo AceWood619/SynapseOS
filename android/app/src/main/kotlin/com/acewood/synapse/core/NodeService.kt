@@ -166,6 +166,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         val client = ha ?: return
         val t = now()
         ble?.let { if (tick % 240 == 0L || !it.running) it.restart() } // Android degrades scans older than 30 min
+        if (tick % 6 == 0L) speech?.reinitIfNeeded()   // retry TTS until a voice engine is ready
         if (bleTracker?.snapshot(t)?.anyKnownNear == true) presence.fire(PresenceFusion.Signal.BLE, t)
         val pub = publisher ?: return
         val toSend = pub.decide(readings(t), t)
