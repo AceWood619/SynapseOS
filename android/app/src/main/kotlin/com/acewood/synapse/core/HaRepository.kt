@@ -30,7 +30,10 @@ object HaRepository {
         if (config == cfg && client != null) return
         client?.stop()
         config = cfg
-        client = HaWsClient(cfg, onChange = { notifyChanged() }).also { it.start() }
+        client = HaWsClient(cfg, onChange = { notifyChanged() }, onAreas = { areas ->
+            setRooms(areas, RoomsConfig(order = cfg.roomOrder))
+            notifyChanged()
+        }).also { it.start() }
     }
 
     @Synchronized

@@ -4,6 +4,8 @@ package com.acewood.synapse.logic
 data class NodeConfig(
     val nodeId: String,
     val room: String,
+    /** The admin/owner's display name, used for the home-screen greeting ("Good morning, Mason"). */
+    val ownerName: String = "",
     val haUrl: String,
     val haToken: String,
     val dashboardPath: String = "/lovelace/0",
@@ -43,7 +45,7 @@ data class NodeConfig(
     /** JSON for persistence; the token is included, so never log this. */
     fun toJson(): String = Json.write(
         linkedMapOf(
-            "node_id" to nodeId, "room" to room, "ha_url" to haUrl, "ha_token" to haToken,
+            "node_id" to nodeId, "room" to room, "owner_name" to ownerName, "ha_url" to haUrl, "ha_token" to haToken,
             "dashboard_path" to dashboardPath, "idle_seconds" to idleSeconds,
             "ambient_brightness" to ambientBrightness.toDouble(), "pin" to pin, "api_port" to apiPort,
             "api_key" to apiKey, "heartbeat_seconds" to heartbeatSeconds, "kiosk" to kiosk,
@@ -54,7 +56,7 @@ data class NodeConfig(
 
     /** Safe-to-show summary (secrets masked). */
     fun redacted(): Map<String, Any?> = linkedMapOf(
-        "node_id" to nodeId, "room" to room, "ha_url" to haUrl,
+        "node_id" to nodeId, "room" to room, "owner_name" to ownerName, "ha_url" to haUrl,
         "ha_token" to if (haToken.isEmpty()) "(unset)" else "(set)",
         "dashboard_path" to dashboardPath, "idle_seconds" to idleSeconds, "api_port" to apiPort,
         "api_key_set" to apiKey.isNotEmpty(), "pin_set" to pin.isNotEmpty(), "kiosk" to kiosk,
@@ -72,6 +74,7 @@ data class NodeConfig(
             return NodeConfig(
                 nodeId = str("node_id"),
                 room = str("room"),
+                ownerName = str("owner_name"),
                 haUrl = str("ha_url").trimEnd('/'),
                 haToken = str("ha_token"),
                 dashboardPath = str("dashboard_path", "/lovelace/0"),

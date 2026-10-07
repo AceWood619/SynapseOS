@@ -18,6 +18,14 @@ object HaWs {
     fun getStatesMessage(id: Long): String =
         Json.write(linkedMapOf("id" to id, "type" to "get_states"))
 
+    // Registry lists — used once after auth to learn HA areas and which entity lives in which area.
+    fun listAreasMessage(id: Long): String =
+        Json.write(linkedMapOf("id" to id, "type" to "config/area_registry/list"))
+    fun listEntitiesMessage(id: Long): String =
+        Json.write(linkedMapOf("id" to id, "type" to "config/entity_registry/list"))
+    fun listDevicesMessage(id: Long): String =
+        Json.write(linkedMapOf("id" to id, "type" to "config/device_registry/list"))
+
     fun callServiceMessage(id: Long, domain: String, service: String, data: Map<String, Any?>, target: Map<String, Any?>? = null): String {
         val m = linkedMapOf<String, Any?>("id" to id, "type" to "call_service", "domain" to domain, "service" to service)
         if (data.isNotEmpty()) m["service_data"] = data
@@ -31,8 +39,10 @@ object HaWs {
         object AuthRequired : Frame()
         object AuthOk : Frame()
         data class AuthInvalid(val message: String) : Frame()
-        /** A reply to one of our commands. states is set for a get_states result. */
-        data class Result(val id: Long, val success: Boolean, val states: List<Entity>?, val error: String?) : Frame()
+        /** A reply to one of our commands. states is set for a get_states result; rows is the raw
+         *  result array (registry lists etc.) matched to the request id. */
+        data class Result(val id: Long, val success: Boolean, val states: List<Entity>?, val error: String?,
+                          val rows: List<Map<String, Any?>>? = null) : Frame()
         /** A state_changed event carrying the entity's new state (null if the entity was removed). */
         data class StateChanged(val entity: Entity?) : Frame()
         object Pong : Frame()
@@ -52,8 +62,9 @@ object HaWs {
                 val success = m["result"] != null && m["success"] != false || m["success"] == true
                 val result = m["result"]
                 val states = (result as? List<Any?>)?.mapNotNull { Entity.fromState(it as? Map<String, Any?>) }
+                val rows = (result as? List<Any?>)?.mapNotNull { it as? Map<String, Any?> }
                 val err = (m["error"] as? Map<String, Any?>)?.get("message") as? String
-                Frame.Result(id, m["success"] == true, states, err)
+                Frame.Result(id, m["success"] == true, states, err, rows)
             }
             "event" -> {
                 val event = m["event"] as? Map<String, Any?>

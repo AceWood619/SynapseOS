@@ -96,7 +96,7 @@ class HomeView(
         (layoutParams ?: LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)).also {
             layoutParams = (it as? LinearLayout.LayoutParams ?: LinearLayout.LayoutParams(-2, -2)).apply { leftMargin = g.dp(context, 10f) }
         }
-        val initial = (cfg.room.firstOrNull() ?: 'M').uppercaseChar()
+        val initial = (cfg.ownerName.trim().firstOrNull() ?: 'S').uppercaseChar()
         addView(TextView(context).apply {
             text = initial.toString(); textSize = 10f; setTextColor(Color.parseColor("#04101f")); typeface = g.disp(context)
             gravity = Gravity.CENTER
@@ -167,7 +167,8 @@ class HomeView(
     private fun greetingText(): String {
         val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val part = when { h < 5 -> "Good night"; h < 12 -> "Good morning"; h < 18 -> "Good afternoon"; else -> "Good evening" }
-        return "$part, ${cfg.nodeId.substringBefore('-').replaceFirstChar { it.uppercase() }.ifBlank { "Mason" }}"
+        val who = cfg.ownerName.trim()
+        return if (who.isNotEmpty()) "$part, $who" else part
     }
 
     private fun summaryText(cache: EntityCache?): String {

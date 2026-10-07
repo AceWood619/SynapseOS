@@ -1,7 +1,9 @@
 package com.acewood.synapse.core
 
 import android.util.Log
+import com.acewood.synapse.logic.Area
 import com.acewood.synapse.logic.EntityCache
+import com.acewood.synapse.logic.HaRegistry
 import com.acewood.synapse.logic.HaWs
 import com.acewood.synapse.logic.NodeConfig
 import okhttp3.OkHttpClient
@@ -21,6 +23,8 @@ class HaWsClient(
     private val cfg: NodeConfig,
     val cache: EntityCache = EntityCache(),
     private val onChange: () -> Unit = {},
+    /** Called once the HA area/entity/device registries have loaded, with the derived areas. */
+    private val onAreas: (List<Area>) -> Unit = {},
 ) {
     @Volatile var connected = false; private set
     @Volatile var lastError: String? = null; private set
@@ -34,6 +38,14 @@ class HaWsClient(
     @Volatile private var authed = false
     @Volatile private var closed = false
     @Volatile private var backoffMs = 1_000L
+
+    // Registry fetch bookkeeping: request id -> which list, plus the rows as they land.
+    private var areaReqId = -1L
+    private var entityReqId = -1L
+    private var deviceReqId = -1L
+    private var areaRows: List<Map<String, Any?>>? = null
+    private var entityRows: List<Map<String, Any?>>? = null
+    private var deviceRows: List<Map<String, Any?>>? = null
 
     private fun wsUrl(): String {
         val base = cfg.haUrl.trimEnd('/')
@@ -79,14 +91,33 @@ class HaWsClient(
             is HaWs.Frame.AuthRequired -> ws?.send(HaWs.authMessage(cfg.haToken))
             is HaWs.Frame.AuthOk -> {
                 authed = true; connected = true; backoffMs = 1_000; lastError = null
+                areaRows = null; entityRows = null; deviceRows = null
                 ws?.send(HaWs.subscribeStatesMessage(id.getAndIncrement()))
                 ws?.send(HaWs.getStatesMessage(id.getAndIncrement()))
+                areaReqId = id.getAndIncrement();   ws?.send(HaWs.listAreasMessage(areaReqId))
+                entityReqId = id.getAndIncrement(); ws?.send(HaWs.listEntitiesMessage(entityReqId))
+                deviceReqId = id.getAndIncrement(); ws?.send(HaWs.listDevicesMessage(deviceReqId))
             }
             is HaWs.Frame.AuthInvalid -> { lastError = "auth invalid: ${f.message}"; closed = true; ws?.close(1000, "auth") }
-            is HaWs.Frame.Result -> { val st = f.states; if (st != null) { cache.applyStates(st); onChange() } }
+            is HaWs.Frame.Result -> {
+                when (f.id) {
+                    areaReqId -> { areaRows = f.rows ?: emptyList(); maybeBuildAreas() }
+                    entityReqId -> { entityRows = f.rows ?: emptyList(); maybeBuildAreas() }
+                    deviceReqId -> { deviceRows = f.rows ?: emptyList(); maybeBuildAreas() }
+                    else -> { val st = f.states; if (st != null) { cache.applyStates(st); onChange() } }
+                }
+            }
             is HaWs.Frame.StateChanged -> { cache.applyStateChanged(f.entity); onChange() }
             else -> {}
         }
+    }
+
+    private fun maybeBuildAreas() {
+        val a = areaRows ?: return
+        val e = entityRows ?: return
+        val d = deviceRows ?: return
+        try { onAreas(HaRegistry.buildAreas(a, e, d)) }
+        catch (ex: Exception) { Log.w(SynapseApp.TAG, "area build failed: ${ex.message}") }
     }
 
     /** Fire a service call (e.g. light.turn_on) at one or more entities. Optimistic: UI updates first. */

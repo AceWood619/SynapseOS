@@ -564,3 +564,68 @@ class RoomControlTest {
         assertTrue(m.extras.any { it.name.contains("lamp", ignoreCase = true) && it.isOn })
     }
 }
+
+class HaRegistryTest {
+    private fun area(id: String, name: String) = mapOf("area_id" to id, "name" to name)
+    private fun ent(id: String, areaId: String? = null, deviceId: String? = null,
+                    disabled: Boolean = false, hidden: Boolean = false, cat: String? = null) =
+        buildMap<String, Any?> {
+            put("entity_id", id)
+            areaId?.let { put("area_id", it) }
+            deviceId?.let { put("device_id", it) }
+            if (disabled) put("disabled_by", "user")
+            if (hidden) put("hidden_by", "user")
+            cat?.let { put("entity_category", it) }
+        }
+    private fun dev(id: String, areaId: String?) = mapOf("id" to id, "area_id" to areaId)
+
+    @Test fun groupsByDirectAreaAndDeviceInheritance() {
+        val areas = listOf(area("living_room", "Living Room"), area("hallway", "Hallway"))
+        val entities = listOf(
+            ent("light.lr_lamp", areaId = "living_room"),              // direct
+            ent("media_player.lr_roku", deviceId = "dev1"),            // inherits from device
+            ent("light.hallway", areaId = "hallway"))
+        val devices = listOf(dev("dev1", "living_room"))
+        val built = HaRegistry.buildAreas(areas, entities, devices)
+        assertEquals(listOf("Living Room", "Hallway"), built.map { it.name })   // HA order kept
+        assertEquals(listOf("light.lr_lamp", "media_player.lr_roku"), built[0].entities)
+    }
+    @Test fun skipsDisabledHiddenConfigAndEmptyAreas() {
+        val areas = listOf(area("living_room", "Living Room"), area("kitchen", "Kitchen"), area("ghost", "Ghost"))
+        val entities = listOf(
+            ent("light.lr", areaId = "living_room"),
+            ent("light.disabled", areaId = "living_room", disabled = true),
+            ent("sensor.hidden", areaId = "living_room", hidden = true),
+            ent("switch.cfg", areaId = "living_room", cat = "config"),
+            ent("sensor.diag", areaId = "kitchen", cat = "diagnostic"))   // kitchen ends up empty
+        val built = HaRegistry.buildAreas(areas, entities, emptyList())
+        assertEquals(listOf("Living Room"), built.map { it.name })       // kitchen+ghost have no real entities
+        assertEquals(listOf("light.lr"), built.single().entities)
+    }
+    @Test fun feedsRoomsBuilderEndToEnd() {
+        val areas = listOf(area("living_room", "Living Room"), area("kitchen", "Kitchen"))
+        val entities = listOf(
+            ent("light.lr_lamp", areaId = "living_room"),
+            ent("media_player.lr_roku", areaId = "living_room"),
+            ent("remote.lr_roku", areaId = "living_room"),
+            ent("light.kitchen_dummy", areaId = "kitchen"))
+        val rooms = Rooms.build(HaRegistry.buildAreas(areas, entities, emptyList()))  // default excludes kitchen
+        assertEquals(listOf("Living Room"), rooms.map { it.name })
+        assertEquals(listOf("light.lr_lamp"), rooms[0].lights)
+        assertEquals(listOf("media_player.lr_roku"), rooms[0].media)
+        assertEquals(listOf("remote.lr_roku"), rooms[0].remotes)
+    }
+}
+
+class OwnerNameTest {
+    @Test fun roundTripsOwnerName() {
+        val c = NodeConfig.fromJson("""{"node_id":"livingroom-01","room":"Living Room","owner_name":"Mason",
+            "ha_url":"http://ha.local:8123","ha_token":"abcdefghijklmnopqrstuvwxyz0123"}""")
+        assertEquals("Mason", c.ownerName)
+        assertEquals("Mason", NodeConfig.fromJson(c.toJson()).ownerName)
+    }
+    @Test fun defaultsToEmptyWhenAbsent() {
+        val c = NodeConfig.fromJson("""{"node_id":"n","room":"r","ha_url":"http://ha.local:8123","ha_token":"abcdefghijklmnopqrstuvwxyz0123"}""")
+        assertEquals("", c.ownerName)
+    }
+}

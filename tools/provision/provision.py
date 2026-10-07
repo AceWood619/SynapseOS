@@ -101,6 +101,7 @@ def main():
     ap.add_argument("--serial", default=None, help="adb serial, e.g. 10.0.0.166:5555")
     ap.add_argument("--node-id", required=True)
     ap.add_argument("--room", required=True)
+    ap.add_argument("--owner-name", default="", help="admin/owner display name for the home-screen greeting, e.g. Mason")
     ap.add_argument("--ha-url", required=True, help="as seen FROM THE PHONE, e.g. http://homeassistant.local:8123")
     ap.add_argument("--ha-url-pc", default=None, help="HA URL as seen from this PC, if different (for verification)")
     ap.add_argument("--token-file", default=None)
@@ -200,7 +201,7 @@ def main():
     adb.sh(f"am start -n {ACTIVITY}")
     time.sleep(4)
     cfg = {
-        "node_id": a.node_id, "room": a.room, "ha_url": a.ha_url.rstrip("/"), "ha_token": token,
+        "node_id": a.node_id, "room": a.room, "owner_name": a.owner_name, "ha_url": a.ha_url.rstrip("/"), "ha_token": token,
         "dashboard_path": a.dashboard_path, "idle_seconds": a.idle_seconds, "pin": sec["pin"],
         "api_port": 8765, "api_key": sec["api_key"], "kiosk": not a.no_kiosk,
         "companion_apps": a.companion,
