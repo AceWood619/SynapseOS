@@ -40,6 +40,7 @@ Legend: ✅ verified on device · ⚠️ caveat · ❓ unconfirmed
 - Recovery ADB (`18D1:D001`) = unauthorized.
 
 ## Never do
+- **Never flash vbmeta with flags 1/2/3 (--disable-verity/--disable-verification).** The warning stays, KeyMint isn't configured, and /data can't be decrypted (tested 2026-10-07 09:42, reverted OK).
 - Don't flash the GSI permanently to system_a with modified vbmeta + `-w` (it booted to "Can't load Android system").
 - Don't undo the v5 prop spoofing or re-enable TrebleDroid `fixSPL` (TrustKernel / `/data` breaks).
 - Don't tap "Factory reset / Wipe data" in recovery.

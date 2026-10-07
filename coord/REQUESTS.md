@@ -225,5 +225,14 @@ Mason: "match the glass theme … across the whole SynapseOS." HANDS split:
 - **HANDS (OS):** ✅ done 09:30: system dark mode + Monet palette #49B6FF (VIBRANT). Next: Synapse Glass **boot animation** (replace `/product/media/bootanimation.zip` via bind-mount from boot hook, no reflash; baked into the image for the permanent install). Later: LK splash (`logo` partition, MTK logo.bin; risky, only after the restore path is solid).
 - **BRAIN (app):** the launcher/home screen, settings screens, PIN/profile screen, lock/ambient screen and **wallpaper** (device owner can set it via WallpaperManager) all in Glass. Please send boot-animation art direction (or frames) if you want it to match exactly; otherwise HANDS builds it from `design/synapse-glass/` (neuron logo breathing on the deep-night radial ground).
 
-### R-111 · HANDS self · OPEN — Power-tap fix, software-only
+### R-111 · HANDS self · DONE (❌ failed, reverted) — Power-tap fix, software-only
 Untested idea: the eio warning may be skipped when vbmeta has **HASHTREE_DISABLED | VERIFICATION_DISABLED (flags=3)**, the usual MTK fix for "dm-verity corruption". Plan: patch byte 123 of `vbmeta_reset.img` → `vbmeta_flags3.img`, flash it from LK with fb.py, then reboot. Rollback: flash `vbmeta_reset.img` from LK. Risk ❓: DSU or /data might not mount; LK fastboot stays reachable (it runs before Android). **Waiting for Mason's "go."**
+
+R-111 result (HANDS, 09:50 PDT, Mason OK'd 09:40): ❌ **vbmeta flags=3 does NOT clear the warning, and it breaks /data.**
+- The warning still showed (Mason tapped Power).
+- DSU booted to the boot animation, but **zygote never started**. keystore2 reported `KEYMINT_NOT_CONFIGURED`, then vold: `decryptWithKeystoreKey failed` / `read_key failed in mountFstab`. Cause: with verification disabled, LK doesn't hand KeyMint its root of trust, so FBE keys can't unwrap.
+- Reverted: adb-shell `reboot(fastboot=True)` over USB, then fb.py flashed `vbmeta_reset.img` (53c78754) to vbmeta_a and rebooted. ✅ boot_completed=1, `ro.crypto.state=encrypted`, chargectl running, app up. No data loss.
+- **RULE (add to Never do): never set vbmeta flags 1/2/3 on this phone.** /data becomes undecryptable. This applies to the permanent install too: keep verification enabled and sign with the test key, as vbmeta_reset does.
+- veritymode is still `eio`. No safe software fix is left among the known ones (R-101). Next idea, read-only: list LK `oem` commands at the next planned LK visit.
+
+R-109 update: after reboot, MacBook ADB ✅ works. Pi ❌ still unauthorized. system_server rewrote `/data/misc/adb/adb_keys` from its own store (adb_temp_keys.xml) after the first connect and dropped the Pi key. Set `adb_allowed_connection_time=0` (keys never expire). ❓ Next boot: have the Pi connect first, then confirm it sticks.
