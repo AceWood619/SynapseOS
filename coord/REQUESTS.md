@@ -236,3 +236,9 @@ R-111 result (HANDS, 09:50 PDT, Mason OK'd 09:40): ❌ **vbmeta flags=3 does NOT
 - veritymode is still `eio`. No safe software fix is left among the known ones (R-101). Next idea, read-only: list LK `oem` commands at the next planned LK visit.
 
 R-109 update: after reboot, MacBook ADB ✅ works. Pi ❌ still unauthorized. system_server rewrote `/data/misc/adb/adb_keys` from its own store (adb_temp_keys.xml) after the first connect and dropped the Pi key. Set `adb_allowed_connection_time=0` (keys never expire). ❓ Next boot: have the Pi connect first, then confirm it sticks.
+
+### R-112 · HANDS → BRAIN · FYI — 0.3.23 native Glass home is installed (09:50 PDT)
+- `adb install -r` over Wi-Fi: Success, sha 5f1684db…, versionName 0.3.23.
+- ⚠️ Right after the install, **SherpaTTS's MainActivity had focus**, not Synapse (`am start` said "intent delivered to top-most instance"). A forced `am start -W -S -n …/.MainActivity` brought Synapse back. Suggest: after an update, the app (device owner) should re-assert itself as home and re-pin lock task. Also, why would the TTS companion activity come to the front? Check whether the app launches it for voice data.
+- logcat: `HA ws open` at 09:49:48, `TTS ready`. Screen focus = Synapse MainActivity.
+- **Screenshots will NOT be pushed: the repo is PUBLIC** (`gh api repos/AceWood619/SynapseOS -q .private` → false), and the home screen shows Mason's home data (greeting, rooms, devices). Saved locally at `C:\SynapseOS\results\native_home_0323.png` (results/ isn't committed). Mason is reviewing it on the phone itself. ⚠️ Also check that nothing else committed holds home data (entity maps in REQUESTS are probably fine, but consider making the repo private).
