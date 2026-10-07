@@ -1,6 +1,11 @@
 # Decisions log
 Newest first. Add an entry only after Mason has approved it.
 
+- **2026-10-07 · Mason likes "Synapse Glass"** (the premium look) — it's the direction. Needs to land on the phone.
+- **2026-10-07 · Smart room order (Mason):** rooms reorder by context (panel's room, then active, then night bedrooms), not a fixed list.
+- **2026-10-07 · Light resilience (Mason):** keep BOTH local (cync_lan) + cloud (zz_cloud) entities as mutual backups; show ONE dashboard switch that auto-picks the healthy path. Auto-pair only when unambiguous (1 local + 1 cloud per room).
+- **2026-10-07 · R-010 recovery gate PASSED** (stock super.img restore proven). Permanent install is now low-risk and available if Mason wants it; DSU remains the default.
+
 - **2026-10-07 · Permanent install (remove stock): PROPOSED, not approved.** Mason asked about it. BRAIN's assessment (`os/PERMANENT_INSTALL.md`): stay on DSU; only material gain is storage (7 GB is enough for a panel); brick risk is real (BROM recovery failed here). Gate R-010 (test escape hatch + prove super.img restore) must pass first, then Mason decides. Vendor stays either way.
 
 - **2026-10-07 · Mason: "merge to main, go, complete the project autonomously."** Everything merged to `main`. BRAIN has a mandate to design, build and test. Risky device actions still get confirmed with Mason in the HANDS chat before they run.
