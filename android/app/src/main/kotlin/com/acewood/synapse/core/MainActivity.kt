@@ -50,6 +50,7 @@ class MainActivity : Activity() {
     private var webCrashes = 0
     private lateinit var splash: LinearLayout
     private var home: HomeView? = null
+    private var roomPad: RoomPadView? = null
     private var brightnessAnim: ValueAnimator? = null
     private var pageReady = false
     private lateinit var ambient: LinearLayout
@@ -359,11 +360,18 @@ class MainActivity : Activity() {
         // Native Glass home (default). HA Lovelace stays loaded underneath as the "HA" tab.
         if (home == null) {
             home = HomeView(this, c,
-                onOpenRoom = { /* room pad: next build */ },
+                onOpenRoom = { room -> showRoomPad(room) },
                 onMic = { openAssist() },
                 onHome = { showHome() }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
                 HaRepository.onChange { h.refresh() }
+            }
+        }
+        if (roomPad == null) {
+            roomPad = RoomPadView(this, onBack = { showHome() }).also { p ->
+                p.visibility = View.GONE
+                root.addView(p, FrameLayout.LayoutParams(-1, -1))
+                HaRepository.onChange { if (p.visibility == View.VISIBLE) p.refresh() }
             }
         }
         home?.refresh()
@@ -375,8 +383,15 @@ class MainActivity : Activity() {
     }
 
     private fun showHome() { home?.let { it.visibility = View.VISIBLE; it.bringToFront() }; web.visibility = View.GONE
+        roomPad?.visibility = View.GONE
         ambient.bringToFront(); splash.bringToFront() }
+    private fun showRoomPad(room: com.acewood.synapse.logic.Room) {
+        roomPad?.let { it.open(room); it.visibility = View.VISIBLE; it.bringToFront() }
+        home?.visibility = View.GONE; web.visibility = View.GONE
+        ambient.bringToFront(); splash.bringToFront()
+    }
     private fun showHa() { web.visibility = View.VISIBLE; web.bringToFront(); home?.visibility = View.GONE
+        roomPad?.visibility = View.GONE
         ambient.bringToFront(); splash.bringToFront() }
     private fun openAssist() {
         try {
