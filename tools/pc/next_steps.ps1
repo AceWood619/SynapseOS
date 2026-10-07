@@ -22,8 +22,9 @@ function AdbSh($c) { & $Adb -s $Serial shell $c 2>&1 }
 Step '0. Update repo, force Unix line endings for phone scripts'
 git pull origin main
 # Re-check-out only the phone-side scripts so .gitattributes gives them LF (doesn't touch other local work).
-git ls-files '*.sh' '*.rc' | ForEach-Object { Remove-Item -Force $_ -ErrorAction SilentlyContinue }
-git checkout -- .
+$phone = git ls-files '*.sh' '*.rc'
+$phone | ForEach-Object { Remove-Item -Force $_ -ErrorAction SilentlyContinue }
+git checkout -- $phone
 git ls-files --eol os/v6/data/boot.sh
 
 Step '1. HA token file'
