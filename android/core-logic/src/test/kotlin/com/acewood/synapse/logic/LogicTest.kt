@@ -392,12 +392,16 @@ class RoomsTest {
         assertEquals(listOf("Living Room", "Master bedroom", "Kids Room", "Dining Room", "Hallway"), rooms.map { it.name })
         assertTrue(rooms.none { it.id == "kitchen" || it.id == "front_door" })
     }
-    @Test fun hidesCloudTwinLights() {
-        val mb = Rooms.build(areas).first { it.id == "master_bedroom" }
+    @Test fun hidesCloudTwinLightsWhenAsked() {
+        val cfg = RoomsConfig(hideCloudTwins = true)   // opt-in; default now keeps both as mutual backup
+        val mb = Rooms.build(areas, cfg).first { it.id == "master_bedroom" }
         assertTrue(mb.lights.none { it.contains("zz_cloud") }, mb.lights.toString())
         assertTrue(mb.lights.contains("light.bedroom") && mb.lights.contains("light.cync_lan_694243630_22"))
-        val hall = Rooms.build(areas).first { it.id == "hallway" }
-        assertEquals(listOf("light.cync_lan_694243630_239"), hall.lights)   // zz twin hidden
+        val hall = Rooms.build(areas, cfg).first { it.id == "hallway" }
+        assertEquals(listOf("light.cync_lan_694243630_239"), hall.lights)
+        // default keeps both:
+        val hallBoth = Rooms.build(areas).first { it.id == "hallway" }
+        assertEquals(2, hallBoth.lights.size)
     }
     @Test fun classifiesMediaAndExtras() {
         val lr = Rooms.build(areas).first { it.id == "living_room" }
@@ -412,5 +416,59 @@ class RoomsTest {
         assertEquals("Hallway", ordered.first().name)
         val keepTwins = Rooms.build(areas, RoomsConfig(hideCloudTwins = false)).first { it.id == "hallway" }
         assertEquals(2, keepTwins.lights.size)
+    }
+}
+
+class ResilientLightTest {
+    @Test fun pairsSingleLocalAndCloud() {
+        val (pair, ambiguous) = ResilientLight.pairRoomLights(listOf("light.cync_lan_694243630_239", "light.zz_cloud_hallway_light"))
+        assertEquals(1, pair.size); assertFalse(ambiguous)
+        assertEquals("light.cync_lan_694243630_239", pair[0].local)
+        assertEquals("light.zz_cloud_hallway_light", pair[0].cloud)
+        assertEquals("Hallway Light", pair[0].name)
+    }
+    @Test fun doesNotGuessWhenMany() {
+        val (pair, ambiguous) = ResilientLight.pairRoomLights(listOf(
+            "light.bedroom", "light.cync_lan_694243630_22", "light.zz_cloud_bedroom_led_strip", "light.zz_cloud_mb_lamp_top"))
+        assertEquals(4, pair.size)       // left individual, not mis-paired
+        assertTrue(ambiguous)             // flagged so Mason can map them
+    }
+    @Test fun failsOverLocalToCloud() {
+        val c = EntityCache()
+        c.applyStates(listOf(
+            Entity("light.cync_lan_1", "unavailable", emptyMap()),
+            Entity("light.zz_cloud_hallway_light", "on", emptyMap())))
+        val rl = ResilientLight("Hallway", "light.cync_lan_1", "light.zz_cloud_hallway_light")
+        assertEquals("light.zz_cloud_hallway_light", rl.stateSource(c))   // local dead -> cloud
+        assertTrue(rl.isOn(c))
+        assertEquals(listOf("light.zz_cloud_hallway_light"), rl.commandTargets(c))
+        // local back online -> prefer it
+        c.applyStates(listOf(Entity("light.cync_lan_1", "off", emptyMap())))
+        assertEquals("light.cync_lan_1", rl.stateSource(c))
+        assertEquals(listOf("light.cync_lan_1", "light.zz_cloud_hallway_light"), rl.commandTargets(c, both = true))
+    }
+}
+
+class RoomOrderTest {
+    private fun room(id: String, name: String, lights: List<String> = emptyList(), media: List<String> = emptyList()) =
+        Room(id, name, lights, emptyList(), media, emptyList())
+    @Test fun hereThenActiveThenRest() {
+        val rooms = listOf(
+            room("living_room", "Living Room", lights = listOf("light.lr")),
+            room("master_bedroom", "Master bedroom", lights = listOf("light.mb")),
+            room("office", "Office"),
+            room("hallway", "Hallway"))
+        val c = EntityCache()
+        c.applyStates(listOf(Entity("light.lr", "off", emptyMap()), Entity("light.mb", "on", emptyMap())))
+        // Panel is in the office; master bedroom is active (light on); daytime.
+        val ordered = RoomOrder.order(rooms, hereRoomId = "office", cache = c, hourOfDay = 14,
+            baseOrder = listOf("living_room", "master_bedroom", "office", "hallway"))
+        assertEquals(listOf("Office", "Master bedroom", "Living Room", "Hallway"), ordered.map { it.name })
+    }
+    @Test fun nightNudgesBedroomsUp() {
+        val rooms = listOf(room("living_room", "Living Room"), room("kids_room", "Kids Room"), room("master_bedroom", "Master bedroom"))
+        val ordered = RoomOrder.order(rooms, hereRoomId = null, cache = EntityCache(), hourOfDay = 23,
+            baseOrder = listOf("living_room", "kids_room", "master_bedroom"))
+        assertEquals(listOf("Kids Room", "Master bedroom", "Living Room"), ordered.map { it.name })
     }
 }

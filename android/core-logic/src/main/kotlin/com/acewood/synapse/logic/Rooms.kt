@@ -22,7 +22,7 @@ data class Room(
 
 data class RoomsConfig(
     val excludedAreas: Set<String> = setOf("kitchen"),
-    val hideCloudTwins: Boolean = true,
+    val hideCloudTwins: Boolean = false,   // Mason: keep both local+cloud as mutual backup; UI pairs them
     /** switch.* whose name contains any of these is an "extra" (feature toggle), not a primary control. */
     val extraSwitchHints: List<String> = listOf("jarvis", "microphone", "replies", "mute", "mitm", "ring", "motion", "ding", "alert", "windows"),
     /** explicit room order; ids not listed go after, in input order. */
