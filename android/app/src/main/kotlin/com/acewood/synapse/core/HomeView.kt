@@ -16,6 +16,7 @@ import android.widget.TextView
 import com.acewood.synapse.logic.Entity
 import com.acewood.synapse.logic.EntityCache
 import com.acewood.synapse.logic.NodeConfig
+import com.acewood.synapse.logic.Profile
 import com.acewood.synapse.logic.Room
 import com.acewood.synapse.logic.RoomOrder
 import java.util.Calendar
@@ -43,12 +44,23 @@ class HomeView(
     private val pillInitial = TextView(context)
     private val pillRole = TextView(context)
     private var profileName: String = cfg.ownerName.trim()
+    private var profileRoomIds: Set<String> = emptySet()
+    private var activeProfile: Profile? = null
 
     /** Show who's using the remote (initial + role) and greet them by name. */
-    fun setProfile(name: String, role: String) {
+    fun setProfile(profile: Profile) {
+        activeProfile = profile
+        setProfile(profile.name, profile.role.name.lowercase(), profile.layout.rooms, profile.layout.tileScale)
+    }
+
+    fun setProfile(name: String, role: String, rooms: List<String> = emptyList(), tileScale: Float = 1f) {
         profileName = name.trim()
+        profileRoomIds = rooms.map { it.trim().lowercase().replace(' ', '_') }.filter { it.isNotEmpty() }.toSet()
         pillInitial.text = (profileName.firstOrNull() ?: 'S').uppercaseChar().toString()
         pillRole.text = role.uppercase()
+        // tileScale is kept in the profile but not applied yet: scaling the whole HomeView crops the
+        // edges on a 360 dp screen. It needs per-tile sizing (follow-up).
+        buildDock()
         lastSig = null; refresh()
     }
 
@@ -311,8 +323,10 @@ class HomeView(
 
     private fun buildRooms(cache: EntityCache?) {
         roomsRow.removeAllViews()
-        val rooms = if (cache != null) RoomOrder.order(HaRepository.rooms, cfg.room.lowercase().replace(' ', '_'), cache,
-            Calendar.getInstance().get(Calendar.HOUR_OF_DAY), cfg.roomOrder) else HaRepository.rooms
+        val visible = if (profileRoomIds.isEmpty()) HaRepository.rooms else
+            HaRepository.rooms.filter { it.id.lowercase() in profileRoomIds }
+        val rooms = if (cache != null) RoomOrder.order(visible, cfg.room.lowercase().replace(' ', '_'), cache,
+            Calendar.getInstance().get(Calendar.HOUR_OF_DAY), cfg.roomOrder) else visible
         if (activeRoomId == null) activeRoomId = rooms.firstOrNull()?.id
         rooms.forEachIndexed { i, r ->
             val on = cache != null && (r.lights.any { cache.get(it)?.on == true && !it.endsWith("_listening_light") } ||
@@ -405,7 +419,7 @@ class HomeView(
 
     private fun buildDock() {
         dockWrap.removeAllViews()
-        val apps = AppCatalog.dock(context)
+        val apps = AppCatalog.dock(context, activeProfile)
         var row: LinearLayout? = null
         apps.forEachIndexed { i, a ->
             if (i % 3 == 0) { row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }; dockWrap.addView(row) }

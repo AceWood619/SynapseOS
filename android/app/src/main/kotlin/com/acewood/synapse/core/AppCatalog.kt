@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.util.Log
+import com.acewood.synapse.logic.Profile
+import com.acewood.synapse.logic.Role
 
 /**
  * The apps Synapse offers on its home dock and in the app drawer. Two kinds:
@@ -51,10 +53,15 @@ object AppCatalog {
     fun installed(ctx: Context, pkg: String): Boolean =
         try { ctx.packageManager.getLaunchIntentForPackage(pkg) != null } catch (_: Exception) { false }
 
-    fun all(ctx: Context): List<App> = INTERNAL_APPS + ANDROID_APPS.filter { a -> a.pkg?.let { installed(ctx, it) } ?: true }
+    fun all(ctx: Context, profile: Profile? = null): List<App> {
+        val available = INTERNAL_APPS + ANDROID_APPS.filter { a -> a.pkg?.let { installed(ctx, it) } ?: true }
+        if (profile == null || profile.role == Role.ADMIN) return available
+        val requested = profile.layout.homeApps.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        return available.filter { !it.adminOnly && (requested.isEmpty() || key(it) in requested) }
+    }
 
-    fun dock(ctx: Context): List<App> {
-        val byKey = all(ctx).associateBy { key(it) }
+    fun dock(ctx: Context, profile: Profile? = null): List<App> {
+        val byKey = all(ctx, profile).associateBy { key(it) }
         return DOCK_IDS.mapNotNull { byKey[it] }
     }
 

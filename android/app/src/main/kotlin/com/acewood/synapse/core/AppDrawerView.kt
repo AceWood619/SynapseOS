@@ -11,6 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.acewood.synapse.logic.Profile
 
 /** The Synapse app drawer: every Synapse screen + every allowed Android app, as a Glass icon grid. */
 @SuppressLint("ViewConstructor")
@@ -18,6 +19,7 @@ class AppDrawerView(
     context: Context,
     private val onBack: () -> Unit,
     private val onLaunch: (AppCatalog.App) -> Unit,
+    private val activeProfile: () -> Profile? = { null },
 ) : FrameLayout(context) {
     private val g = Glass
     private val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -49,7 +51,7 @@ class AppDrawerView(
 
     fun open() {
         grid.removeAllViews()
-        val apps = AppCatalog.all(context)
+        val apps = AppCatalog.all(context, activeProfile())
         var row: LinearLayout? = null
         apps.forEachIndexed { i, a ->
             if (i % 4 == 0) { row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }; grid.addView(row) }

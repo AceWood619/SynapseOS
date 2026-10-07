@@ -427,7 +427,8 @@ class MainActivity : Activity() {
             }
         }
         if (drawerView == null) {
-            drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) }).also { v ->
+            drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) },
+                activeProfile = { activeProfile }).also { v ->
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
@@ -464,7 +465,7 @@ class MainActivity : Activity() {
 
     private fun applyProfileToHome() {
         val p = activeProfile ?: return
-        home?.setProfile(p.name, p.role.name.lowercase())
+        home?.setProfile(p)
     }
 
     private fun showProfileLock() {
