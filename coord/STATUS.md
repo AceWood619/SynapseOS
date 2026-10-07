@@ -10,9 +10,10 @@ _Last updated: 2026-10-07 09:12 PDT (HANDS)_
 - **Known pain:** Power tap within 5 s each boot (R-101, won't fix). Zadig WinUSB on 0E8D:201C → stock fastboot.exe can't see LK; fastbootd (18D1:4EE0) still uses stock fastboot.exe.
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 15:35 UTC (BRAIN)._
-- **Fixed R-104 (TTS queries), R-105 (leave-kiosk), R-106 (run-now detach)** — pushed, CI building. Re-test on next APK.
-- **Started R-107 (Mason's big ask: native remote-for-the-house UI).** Decision: Views, not Compose (lighter on GE8320, verifiable). Foundation done: HA WebSocket + EntityCache, 29 tests. Plan in `docs/R-107_NATIVE_UI_PLAN.md`.
-- **Next (BRAIN):** OkHttp HaWsClient, then the remote UI phase by phase.
-- **Need from Mason:** home-screen app list; room→entity mapping; logo approval.
-- **Needs Mason:** R-001 (16 kHz mic), R-010 (permanent install decision — not needed for R-107).
+_Last updated: 2026-10-07 16:05 UTC (BRAIN)._
+- **R-107 foundations done (all tested, 38 tests):** HA WebSocket + EntityCache; multi-user Profiles/roles; **Rooms model from your real HA areas** (kitchen + empty skipped, zz_cloud twins hidden, Roku=D-pad).
+- **Design:** "Synapse Glass" language + live prototype published to Mason (`design/synapse-glass/`).
+- **Wireless access** from dining PC / MacBook / RP5: `tools/remote-access/` (authorize each ADB key).
+- **Noting:** recovery path is PROVEN (HANDS restored stock super.img this morning) → permanent install is now a real option for Mason, though DSU is fine.
+- **Next (BRAIN):** OkHttp HaWsClient (wire the live data), then build the Synapse Glass home screen + room pads + PIN/profile switch in Views.
+- **Need from Mason:** reaction to the Synapse Glass look; room order; keep/hide the zz_cloud twins.
