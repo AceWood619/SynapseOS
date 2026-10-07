@@ -158,4 +158,12 @@ Wants:
 2. **Synapse home screen / launcher:** app drawer (allowed apps), dock, widgets, Synapse settings, node status. It feels like its own OS while kiosk keeps strangers out. An app allowlist is managed in settings (PIN-protected).
 3. Keep the HA Lovelace view as one tab ("Advanced / HA").
 Constraints: 720×1600 at 320 dpi, PowerVR GE8320 → keep animations light (no heavy blur). Mason asked about permanently removing stock; HANDS advised **it's not needed for this** (launcher/UI are app work). Mason hasn't decided yet.
+**Design north star (Mason, 08:50): "it needs to feel like a remote but for the house."** Read it as a TV remote for the home:
+- **One-handed, thumb-reach first:** the most-used controls sit in the bottom half, big hit targets (≥ 64 dp), no hunting through menus.
+- **Physical-button feel:** chunky tiles with press feedback (vibration CLICK effect — this phone supports prebaked CLICK/TICK, verified), instant visual state (on/off glow), no web-page scrolling feel.
+- **Room = channel:** swipe left/right between rooms like flipping channels. Each room shows its lights/climate/media/scenes as a remote pad.
+- **"Power" and "Home" buttons:** an always-visible **All off / Good night** and a **Home** button (back to the house overview), like a remote's power and home keys.
+- **Media D-pad for TVs/speakers:** play/pause, volume ±, source, like a real remote when a media player is selected.
+- **Mic button = Jarvis push-to-talk:** the big round button, like a voice remote.
+- Fast: actions fire on the touch-down/release with optimistic UI, then confirm from the HA state.
 Mason still has to say which apps go on the home screen (asked: Camera, Settings, Jarvis chat, HA, browser, music?).
