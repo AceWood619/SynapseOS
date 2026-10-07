@@ -10,8 +10,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: synapse-core-${{ github.ref }}
-  cancel-in-progress: false
+  # A newer push supersedes older queued builds; only the newest APK needs publishing.
+  group: synapse-core
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -54,22 +55,33 @@ jobs:
           name: synapse-core-apk
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      # The phone-side chat (HANDS) pulls APKs with plain git, so publish into builds/ on main.
+      # HANDS pulls builds/ with plain git, so publish the APK onto main.
+      # Race-proof: stash the APK outside the tree, hard-reset to the live main,
+      # lay the APK back, commit only builds/, push with loud retries.
       - name: Publish APK to builds/
         if: github.ref == 'refs/heads/main'
         run: |
           set -e
-          ver="0.1.${{ github.run_number }}"
-          mkdir -p builds
-          cp android/app/build/outputs/apk/release/app-release.apk builds/synapse-core-latest.apk
-          sha=$(sha256sum builds/synapse-core-latest.apk | cut -d' ' -f1)
-          printf '{"app":"synapse-core","version":"%s","sha256":"%s","commit":"%s","built":"%s"}\n' \
-            "$ver" "$sha" "${{ github.sha }}" "$(date -u +%FT%TZ)" > builds/synapse-core-latest.json
-          git config user.name "synapse-ci"
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+          cp "$apk" "$RUNNER_TEMP/synapse.apk"
+          base=$(grep -oE 'versionName = "[0-9]+\.[0-9]+' android/app/build.gradle.kts | grep -oE '[0-9]+\.[0-9]+' | head -1)
+          ver="${base:-0.0}.${GITHUB_RUN_NUMBER}"
+          git config user.name  "synapse-ci"
           git config user.email "synapse-ci@users.noreply.github.com"
-          git add builds/
-          git commit -m "CI: synapse-core $ver [skip ci]"
-          for i in 1 2 3 4; do
-            git pull --rebase origin main && git push origin HEAD:main && break
-            sleep $((i * 5))
+          pushed=0
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main      # discard any build/renormalization noise in the tree
+            mkdir -p builds
+            cp "$RUNNER_TEMP/synapse.apk" builds/synapse-core-latest.apk
+            sha=$(sha256sum builds/synapse-core-latest.apk | cut -d' ' -f1)
+            printf '{"app":"synapse-core","version":"%s","sha256":"%s","commit":"%s","built":"%s"}\n' \
+              "$ver" "$sha" "$GITHUB_SHA" "$(date -u +%FT%TZ)" > builds/synapse-core-latest.json
+            git add builds/synapse-core-latest.apk builds/synapse-core-latest.json
+            if git diff --cached --quiet; then echo "builds/ already current"; pushed=1; break; fi
+            git commit -q -m "CI: synapse-core $ver [skip ci]"
+            if git push origin HEAD:main; then echo "published $ver"; pushed=1; break; fi
+            echo "push attempt $i rejected; retrying"; sleep $((i * 5))
           done
+          if [ "$pushed" != 1 ]; then echo "::error::failed to publish APK after 5 attempts"; exit 1; fi
