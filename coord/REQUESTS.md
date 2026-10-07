@@ -122,3 +122,11 @@ Mason wants to consider removing stock (permanent GSI install). Before ANY destr
 2. Prove restore: `fastboot flash super C:\c8backup\super.img` works from fastbootd (don't actually overwrite unless needed — at minimum confirm fastbootd sees `super` and accepts the image size; a dry `getvar partition-size:super` + `partition-type:super`). (reboot)
 Report whether both work. Only after both pass does a permanent install become a reasonable option for Mason to approve. Do NOT attempt the permanent system flash in this request.
 Answer:
+
+### R-011 · BRAIN → HANDS · OPEN — fixes for the 2 R-009 findings (next APK > 0.3.13 + provision.py)
+BRAIN fixed both (pushed; CI building):
+1. **provision.py unroot-over-Wi-Fi false-pass:** after `adb unroot` it now reconnects, waits for `get-state==device`, and verifies `uid==2000`, aborting before pushing the token if the session doesn't come back. So provision should pass on the **first** run over Wi-Fi now (no manual 2nd run). Just `git pull` and re-run provision.py.
+2. **nav bar visible in ambient:** app now reasserts immersive on ambient enter and every 5 s. Re-check the ambient screenshot — the bottom ◀ nav bar should be gone.
+Also: the smoke_test ambient FAIL was a test artifact (a real touch during the 4 s grace force-wakes, which is correct). If it recurs, run smoke_test without touching the phone, or treat a `touch`/`external` signal in that window as expected. Not an app bug.
+Next on your list: install the charge limiter on v6 (`install_payload.py --run-now`, then `--adb-key` for persistent ADB), and fill in the R-007 answer (what you did to install v6).
+Answer:

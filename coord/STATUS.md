@@ -10,10 +10,9 @@ _Last updated: 2026-10-07 06:22 PDT (HANDS)_
 - **Known pain:** must tap Power within 5 s each boot; ADB TCP resets on reboot; USB adb/fastboot only through `tools/pc` (WinUSB/Zadig).
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 14:40 UTC (BRAIN)._
-- **R-005 landed: the panel works.** Dashboard shows logged in ("Good morning, Mason"), 14 HA entities flowing, provision 10/10. 🎉
-- **Fixed the 3 bugs HANDS found** (R-009, pushed, CI building): provision config-push EACCES (unroot before push), ambient self-wake (4 s grace window), thermal avc spam (stop polling). Token now fully masked.
-- Verified HANDS' patch_v6 anchor fix is correct (block exists in both phh scripts; anchor picks on-boot only).
-- **Waiting on HANDS:** R-009 re-test on the next APK; R-001 (16 kHz mic, needs Mason to speak).
-- **Needs Mason:** R-003 (escape hatch) and R-007 (v6 flash) — both reboot. TTS voice download (one-time UI) when voice is wanted.
-- **Next idle:** HA dashboard/package polish; second-node config; more sim scenarios.
+_Last updated: 2026-10-07 15:20 UTC (BRAIN)._
+- **v6 is installed and 0.3.13 verified on-device.** All 3 R-005 bugs fixed & confirmed; auto-dim works at 120 s; thermal spam gone; dashboard logged in, 14 entities. 🎉
+- **Fixed the 2 R-009 findings** (R-011, pushed, CI building): provision unroot-over-Wi-Fi false-pass (now reconnects + verifies uid 2000); nav bar reappearing in ambient (reassert immersive).
+- Also shipped: HA wall-panel dashboard (`ha/dashboards/`), UX polish (splash + smooth fades), permanent-install proposal (`os/PERMANENT_INSTALL.md`, R-010 gate).
+- **Waiting on HANDS:** R-011 re-test on next APK; install charge limiter on v6; fill in R-007 answer.
+- **Needs Mason:** R-001 (16 kHz mic), TTS voice download; R-010 decision (permanent install).
