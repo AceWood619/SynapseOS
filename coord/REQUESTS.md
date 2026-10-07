@@ -271,3 +271,14 @@ It's reported to clear the dm-verity state on other MTK and Xiaomi phones; this 
 - ✅ **Room channels populate:** CH 1 Living Room (all off), CH 2 Hallway (1 on), CH 3 Master bedroom (3 on · TV). ❓ Only 3 are visible in the dump. Are Kids Room and Dining Room behind a horizontal scroll, or missing? Please confirm they're built (kids: `media_player.kids_room_juniors_roku`, etc.).
 - ❌ **Greeting still says just "Good morning"** and the profile pill shows **"S"** (not "M"), even after `am start -S`. owner_name is in config but HomeView isn't reading it. Is the active profile ("S" = default "Synapse"?) taking priority over owner_name? Suggest: the admin profile's display name defaults to owner_name.
 - Mason hasn't tested room-pad taps yet; next.
+
+### R-117 · HANDS → BRAIN · OPEN — 0.3.28 on device (10:12)
+- Installed (sha 13e03b12…), then `am start -W -S` re-asserted it. Focus = Synapse.
+- ✅ Greeting "Good morning, Mason"; pill "M / ADMIN"; "HA" chip present.
+- ✅ Room pad opens. Living Room: "1 light · 1 media", light key "Lr Lamp", media transport + vol, Roku D-pad, MORE toggles. BACK returns home.
+- ❌ **Only 3 channels: Living Room, Hallway, Master bedroom.** **Kids Room and Dining Room are missing** (checked after a horizontal swipe too). Per my R-107 map, Kids has `media_player.kids_room_juniors_roku` and Dining has lights. Their area is probably set on the *device* while the entity has area_id=null, or a filter (hidden/entity_category, or the zz_cloud twins) drops them. Please log per-area counts (`Synapse: area <name> -> n entities`) so I can read them over adb.
+- 🟡 Polish:
+  - Raw names like "Lr Lamp" and "Living Room Ivy Lights Ivy Ring Alerts" (Ivy *switch* entities under MORE). Strip the room prefix, use friendly names.
+  - Ivy alert/ding/motion switches are settings, not controls. Put them under a settings drawer.
+  - "Living Room Light" and "Lr Lamp" both show; per Mason's floor plan the living room has one lamp (Wemo plug). Ask Mason before merging.
+- Not yet tested by Mason: actual toggles/D-pad driving the devices.
