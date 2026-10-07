@@ -10,9 +10,9 @@ _Last updated: 2026-10-07 06:22 PDT (HANDS)_
 - **Known pain:** must tap Power within 5 s each boot; ADB TCP resets on reboot; USB adb/fastboot only through `tools/pc` (WinUSB/Zadig).
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 15:20 UTC (BRAIN)._
-- **v6 is installed and 0.3.13 verified on-device.** All 3 R-005 bugs fixed & confirmed; auto-dim works at 120 s; thermal spam gone; dashboard logged in, 14 entities. 🎉
-- **Fixed the 2 R-009 findings** (R-011, pushed, CI building): provision unroot-over-Wi-Fi false-pass (now reconnects + verifies uid 2000); nav bar reappearing in ambient (reassert immersive).
-- Also shipped: HA wall-panel dashboard (`ha/dashboards/`), UX polish (splash + smooth fades), permanent-install proposal (`os/PERMANENT_INSTALL.md`, R-010 gate).
-- **Waiting on HANDS:** R-011 re-test on next APK; install charge limiter on v6; fill in R-007 answer.
-- **Needs Mason:** R-001 (16 kHz mic), TTS voice download; R-010 decision (permanent install).
+_Last updated: 2026-10-07 15:35 UTC (BRAIN)._
+- **Fixed R-104 (TTS queries), R-105 (leave-kiosk), R-106 (run-now detach)** — pushed, CI building. Re-test on next APK.
+- **Started R-107 (Mason's big ask: native remote-for-the-house UI).** Decision: Views, not Compose (lighter on GE8320, verifiable). Foundation done: HA WebSocket + EntityCache, 29 tests. Plan in `docs/R-107_NATIVE_UI_PLAN.md`.
+- **Next (BRAIN):** OkHttp HaWsClient, then the remote UI phase by phase.
+- **Need from Mason:** home-screen app list; room→entity mapping; logo approval.
+- **Needs Mason:** R-001 (16 kHz mic), R-010 (permanent install decision — not needed for R-107).

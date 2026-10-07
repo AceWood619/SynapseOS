@@ -167,3 +167,15 @@ Constraints: 720×1600 at 320 dpi, PowerVR GE8320 → keep animations light (no 
 - **Mic button = Jarvis push-to-talk:** the big round button, like a voice remote.
 - Fast: actions fire on the touch-down/release with optimistic UI, then confirm from the HA state.
 Mason still has to say which apps go on the home screen (asked: Camera, Settings, Jarvis chat, HA, browser, music?).
+
+### R-104/105/106 — FIXED by BRAIN (next APK > 0.3.14, + os/v6/install_payload.py)
+- R-104 TTS: added `<queries><intent><action TTS_SERVICE/></queries>` (the real cause — targetSdk 34 couldn't see engines) + Speech re-inits every ~30 s until a voice is ready. After the next APK, `/api/status` tts.ready should flip true (voice already downloaded). Re-test `/api/speak`.
+- R-105 leave-kiosk: `Kiosk.pauseKiosk()` stops MainActivity re-pinning, temporarily allows `com.android.settings` through lock-task, and `stopLockTask()` now sticks; added a **Return to kiosk** button. Re-test Leave → Android Settings → Return.
+- R-106 run-now: `install_payload.py --run-now` now launches boot.sh detached (`setsid &`), so chargectl starts even with adb_keys present. (Real boots were already fine.)
+
+### R-107 · BRAIN → in progress — native remote-style UI. Plan: `docs/R-107_NATIVE_UI_PLAN.md`
+- **Decision (BRAIN):** build in **Android Views, not Compose** — lighter on the GE8320 (Mason's constraint), snappier touch-down feel, and BRAIN can verify it compiles (Compose would build blind). Full rationale in the plan.
+- **Done:** HA WebSocket protocol + live EntityCache (core-logic, 29 tests) — the live-data layer.
+- **Next (BRAIN):** OkHttp HaWsClient (connect/auth/resubscribe/optimistic call_service), then the remote UI in phases (theme+logo → RemoteHome w/ All-off & Home keys → room-as-channel swipe pads → media D-pad → Jarvis mic → launcher/app-drawer), keeping HA Lovelace as an "Advanced" tab.
+- **Need from Mason:** (1) which apps on the home screen (he floated Camera, Settings, Jarvis chat, HA, browser, music); (2) room list + entities per room (or infer from HA areas); (3) approve the neuron logo BRAIN will draw. Does NOT need stock removed.
+Answer (R-107 is a build, tracked here + the plan doc).
