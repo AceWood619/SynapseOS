@@ -46,14 +46,19 @@ Why: the first on-device test of Synapse Core v0.1.
 Done when: status JSON pasted + Mason confirms the dashboard shows and the screen dims and wakes.
 Answer:
 
-### R-006 · BRAIN → HANDS · OPEN (low risk, reversible: reboot restores normal charging)
+### R-006 · BRAIN → HANDS · TAKEN (+30 min recheck pending) (low risk, reversible: reboot restores normal charging)
 Ask: on the current v5 DSU, with ADB root: `python os/v6/install_payload.py --adb … --serial 10.0.0.166:5555 --run-now` (**without** `--adb-key` this first time). Then measure:
 1. `cat /proc/mtk_battery_cmd/current_cmd` and `getprop sys.synapse.charge`.
 2. To force a hold, run `setprop persist.synapse.charge_high <current%-1>` and wait up to 60 s. Then `dumpsys battery` (status, level) and `cat /sys/class/power_supply/battery/current_now` (if present) at +0, +10 and +30 min. Is the phone **powered from the charger (level flat) or draining**?
 3. `setprop persist.synapse.charge_high 80` afterwards.
 Why: proves the charge limiter before baking the hook into v6.
 Done when: hold/charge transitions are logged in `/data/adb/synapse/chargectl.log` and the drain-or-flat answer is known.
-Answer:
+Answer (HANDS, 06:40 PDT): ✅ the hold works and the phone stays powered from the charger.
+- `install_payload.py --run-now` with no `--adb-key`.
+- ⚠️ **BUG: CRLF line endings.** On Windows, git checked out `boot.sh`/`chargectl.sh` with CRLF, so boot.sh failed: `can't create /data/adb/synapse\r/boot.log`. I fixed it on the device with `sed -i 's/\r$//'`, and in the repo by adding `.gitattributes` (`*.sh/*.py/*.rc/os/v6/data/* eol=lf`). Suggest also stripping `\r` in install_payload.py before pushing.
+- After the fix: `chargectl started`, `cap=100% temp=214 -> hold (cmd now: 0 1)`, `sys.synapse.charge=hold`.
+- Measured during hold, on USB from the PC (500 mA): status `Not charging`; `current_now` swings −21300…+8500 (≈0 mA average, units µA); voltage steady 4.370–4.385 V; capacity 100 %; `mtk-master-charger/online=1`. So the power path feeds the system and the battery is about idle.
+- ❓ Long-term drain still unmeasured; check capacity again after several hours. The limiter is left running until the next reboot.
 
 ### R-007 · BRAIN → HANDS · OPEN — ⚠️ NEEDS MASON'S OK (DSU reinstall wipes DSU /data)
 Ask: after R-006 passes, build `os/v6` (`build_v6.sh`), reinstall the DSU with the v5 sizes, re-provision (R-005 script), then run `install_payload.py --adb-key <adb.exe key> --adb-key <adb-shell key>` and reboot. Check the verify list in `os/v6/README.md`.
