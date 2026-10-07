@@ -38,6 +38,21 @@ HaWsClient (OkHttp WebSocket)  ──►  EntityCache (done, tested)  ──► 
 - Fire on touch-down/up with **optimistic UI** (tile flips instantly), then reconcile from the HA
   state_changed event. If HA rejects/doesn't change within ~2 s, revert the tile + short error buzz.
 
+## Multi-user (Mason, 2026-10-07)
+Profiles stored on the device; the **active user is chosen by the PIN entered** ("code set at setup").
+Roles map to the Level 0/1/2 security model:
+| Role | Max action level | UI | Powers |
+|---|---|---|---|
+| **Admin** (Mason) | 2 (locks/garage/alarm) | full | everything + manage profiles/settings/nodes |
+| **User** (e.g. Riah) | 2 | full | all controls; can't edit Synapse settings/profiles |
+| **Child** | 0 (lights/media/temp) | simplified, big tiles | no cameras/doors/security; limited apps; own orientation |
+| **Guest** | 0, shared rooms | simplified | lights/media/temp only; minimal apps; the default/locked view |
+- Each profile carries its own **orientation + layout** (home apps, visible rooms, accent, tile scale).
+- Lock screen: enter PIN -> switch to that profile; idle/locked shows the default (guest) view.
+- **Done:** Profiles/Role/Layout model (core-logic, 34 tests). PINs hashed (one device salt), dup PINs rejected.
+- **Next:** a PIN lock/switch screen, a Settings pane (admin-only) to add/edit profiles, and applying each
+  profile's orientation + allowed rooms/apps across the UI.
+
 ## Open input from Mason
 - Which apps on the home screen? He floated: Camera, Settings, Jarvis chat, HA, browser, music.
 - Room list + which entities per room (or we infer from HA areas once we read the registry).
