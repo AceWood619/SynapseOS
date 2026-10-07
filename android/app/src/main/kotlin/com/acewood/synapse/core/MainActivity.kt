@@ -57,6 +57,7 @@ class MainActivity : Activity() {
     private var jarvisView: JarvisView? = null
     private var intercomView: IntercomView? = null
     private var audioView: AudioView? = null
+    private var diagnosticsView: DiagnosticsView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -71,6 +72,7 @@ class MainActivity : Activity() {
                 home?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                diagnosticsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile)
             }, 350)
         }
@@ -418,6 +420,11 @@ class MainActivity : Activity() {
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
+        if (diagnosticsView == null) {
+            diagnosticsView = DiagnosticsView(this, onBack = { showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
         if (drawerView == null) {
             drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) },
                 activeProfile = { activeProfile }, onAllOff = { home?.allOffNow() }).also { v ->
@@ -480,7 +487,7 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }
@@ -502,6 +509,7 @@ class MainActivity : Activity() {
                     "jarvis" -> showOverlay(jarvisView)
                     "audio" -> showOverlay(audioView) { it.open() }
                     "sensors" -> showOverlay(sensorsView) { it.open() }
+                    "diagnostics" -> showOverlay(diagnosticsView) { it.open() }
                     "ha" -> showHa()
                     "music" -> showHa("/media-browser/browser")
                     "browser" -> startActivity(Intent(this, BrowserActivity::class.java))
