@@ -52,7 +52,7 @@ data class NodeConfig(
     /** Safe-to-show summary (secrets masked). */
     fun redacted(): Map<String, Any?> = linkedMapOf(
         "node_id" to nodeId, "room" to room, "ha_url" to haUrl,
-        "ha_token" to if (haToken.isEmpty()) "" else "…" + haToken.takeLast(4),
+        "ha_token" to if (haToken.isEmpty()) "(unset)" else "(set)",
         "dashboard_path" to dashboardPath, "idle_seconds" to idleSeconds, "api_port" to apiPort,
         "api_key_set" to apiKey.isNotEmpty(), "pin_set" to pin.isNotEmpty(), "kiosk" to kiosk,
         "companion_apps" to companionApps, "ble_known" to bleKnown.size, "camera" to camera,

@@ -61,6 +61,8 @@ class NodeConfigTest {
         assertFalse(r.contains("abcdefghijklmnop"))
         assertFalse(r.contains("0123456789abcdef"))
         assertFalse(r.contains("2468"))
+        assertFalse(r.contains("0123"))              // no token suffix at all
+        assertTrue(r.contains("(set)"))
     }
 }
 
@@ -120,13 +122,19 @@ class PresenceTest {
 
 class IdleTest {
     @Test fun goesAmbientAndWakes() {
-        val c = IdleController(10_000)
+        val c = IdleController(10_000, graceMs = 4_000)
         assertFalse(c.tick(0))
         assertFalse(c.tick(9_999))
         assertTrue(c.tick(10_000)); assertEquals(IdleController.Mode.AMBIENT, c.mode)
-        assertTrue(c.activity(11_000)); assertEquals(IdleController.Mode.ACTIVE, c.mode)
+        // Within the grace window, a sensor wake is ignored (prevents the dim->settle bounce).
+        assertFalse(c.activity(11_000)); assertEquals(IdleController.Mode.AMBIENT, c.mode)
+        // A real touch (force) wakes even inside grace.
+        assertTrue(c.activity(11_500, force = true)); assertEquals(IdleController.Mode.ACTIVE, c.mode)
         assertFalse(c.tick(15_000))
-        assertTrue(c.forceAmbient()); assertFalse(c.forceAmbient())
+        // Force ambient, then a sensor wake after the grace window wakes normally.
+        assertTrue(c.forceAmbient(20_000)); assertFalse(c.forceAmbient(20_000))
+        assertFalse(c.activity(22_000))                       // still in grace
+        assertTrue(c.activity(24_001)); assertEquals(IdleController.Mode.ACTIVE, c.mode)  // past grace
     }
 }
 

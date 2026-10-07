@@ -59,8 +59,8 @@ class MainActivity : Activity() {
 
     private val commands: (NodeBus.Command) -> Unit = { c ->
         when (c) {
-            NodeBus.Command.WAKE -> if (idle.activity(now())) applyMode()
-            NodeBus.Command.AMBIENT -> if (idle.forceAmbient()) applyMode()
+            NodeBus.Command.WAKE -> if (idle.activity(now())) applyMode()          // sensor wake: respects grace
+            NodeBus.Command.AMBIENT -> if (idle.forceAmbient(now())) applyMode()
             NodeBus.Command.RELOAD, NodeBus.Command.CONFIG_CHANGED -> loadConfigAndPage()
         }
     }
@@ -194,7 +194,7 @@ class MainActivity : Activity() {
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             val wasAmbient = idle.mode == IdleController.Mode.AMBIENT
-            if (idle.activity(now())) applyMode()
+            if (idle.activity(now(), force = true)) applyMode()
             NodeBus.emit(NodeBus.Event.TOUCH)
             if (ev.x < dp(100) && ev.y < dp(100)) cornerTap()
             if (wasAmbient) return true // the waking tap shouldn't also press a dashboard button

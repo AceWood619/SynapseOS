@@ -123,9 +123,17 @@ def main():
 
     adb = Adb(a.adb, a.serial)
 
-    # 1. connect
+    # 1. connect. Provision runs as the ADB *shell* user (uid 2000), never root: a config.json
+    # pushed while adbd is root lands root-owned in the app's external dir and the app gets EACCES
+    # (found on 0.3.11). None of the commands below need root, so drop root up front.
     if a.serial and ":" in a.serial:
         subprocess.run([a.adb, "connect", a.serial], capture_output=True, text=True, timeout=20)
+    if adb.sh("id -u").strip() == "0":
+        adb.run("unroot", timeout=20)
+        time.sleep(2)
+        if a.serial and ":" in a.serial:
+            subprocess.run([a.adb, "connect", a.serial], capture_output=True, text=True, timeout=20)
+        step("adb dropped to shell user (so config.json is app-readable)", adb.sh("id -u").strip() != "0", "uid " + adb.sh("id -u").strip())
     model = adb.sh("getprop ro.product.vendor.model")
     if not step("phone reachable over adb", bool(model) and "error" not in model.lower(), model):
         return finish()
@@ -202,8 +210,12 @@ def main():
             res = json.loads(raw)
             break
     leftover = adb.sh(f"ls {EXT_DIR}/config.json 2>/dev/null")
-    step("config imported by app", bool(res and res.get("ok")), json.dumps(res.get("errors") if res and not res.get("ok") else "") if res else "no result file after 60 s")
-    step("token file removed from shared storage", "config.json" not in leftover)
+    imported = bool(res and res.get("ok"))
+    step("config imported by app", imported, json.dumps(res.get("errors") if res and not res.get("ok") else "") if res else "no result file after 60 s")
+    if not imported and "config.json" in leftover:
+        adb.sh(f"rm -f {EXT_DIR}/config.json")   # never leave the token on shared storage after a failure
+        leftover = adb.sh(f"ls {EXT_DIR}/config.json 2>/dev/null")
+    step("token file not left on shared storage", "config.json" not in leftover)
 
     # 7. home app + device owner
     if a.device_owner:

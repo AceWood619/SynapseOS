@@ -68,6 +68,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
     private var luxBaseline: Double? = null
     @Volatile private var lastPublishOk = 0L
     @Volatile private var publishErrors = 0
+    @Volatile private var thermalReadable = true  // stop polling after first SELinux denial (avc spam)
 
     private val busEvents: (NodeBus.Event) -> Unit = { e ->
         if (e == NodeBus.Event.TOUCH) presence.fire(PresenceFusion.Signal.TOUCH, now())
@@ -295,15 +296,19 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         (mi.availMem / (1024 * 1024)).toDouble()
     } catch (e: Exception) { null }
 
-    /** Thermal zone readable by apps on this device: tries the MTK AP zone, then zone0. */
+    /** Thermal zone readable by apps on this device: tries the MTK AP zone, then zone0.
+     *  On this GSI, untrusted_app is SELinux-denied from /sys/class/thermal (avc spam every tick),
+     *  so after the first failure we stop polling and report null. */
     private fun cpuTemp(): Double? {
+        if (!thermalReadable) return null
         try {
-            val zones = File("/sys/class/thermal").listFiles { f -> f.name.startsWith("thermal_zone") } ?: return null
+            val zones = File("/sys/class/thermal").listFiles { f -> f.name.startsWith("thermal_zone") }
+                ?: run { thermalReadable = false; return null }
             val pick = zones.firstOrNull { runCatching { File(it, "type").readText().trim() == "mtktsAP" }.getOrDefault(false) }
                 ?: zones.firstOrNull { it.name == "thermal_zone0" } ?: return null
             val raw = File(pick, "temp").readText().trim().toDouble()
             return if (raw > 1000) raw / 1000.0 else raw
-        } catch (e: Exception) { return null }
+        } catch (e: Exception) { thermalReadable = false; return null }
     }
 
     private fun ipAddress(): String? = try {
