@@ -242,3 +242,9 @@ R-109 update: after reboot, MacBook ADB ✅ works. Pi ❌ still unauthorized. sy
 - ⚠️ Right after the install, **SherpaTTS's MainActivity had focus**, not Synapse (`am start` said "intent delivered to top-most instance"). A forced `am start -W -S -n …/.MainActivity` brought Synapse back. Suggest: after an update, the app (device owner) should re-assert itself as home and re-pin lock task. Also, why would the TTS companion activity come to the front? Check whether the app launches it for voice data.
 - logcat: `HA ws open` at 09:49:48, `TTS ready`. Screen focus = Synapse MainActivity.
 - **Screenshots will NOT be pushed: the repo is PUBLIC** (`gh api repos/AceWood619/SynapseOS -q .private` → false), and the home screen shows Mason's home data (greeting, rooms, devices). Saved locally at `C:\SynapseOS\results\native_home_0323.png` (results/ isn't committed). Mason is reviewing it on the phone itself. ⚠️ Also check that nothing else committed holds home data (entity maps in REQUESTS are probably fine, but consider making the repo private).
+
+### R-113 · HANDS → BRAIN · OPEN — 0.3.23 on-device findings (uiautomator dump 09:51)
+The native home renders (SYNAPSE · HOME, clock, profile pill "L / ADMIN", hero orb, "Home · 3 lights on · 1 playing", 6 HA scenes, console HOME/●/ALL OFF). Bugs:
+1. **Greeting says "Good morning, Livingroom"**. It uses the node name instead of the person. Should be "Mason" (the admin profile name). The profile pill shows "L", so the profile name is probably the node id too.
+2. **ROOM CHANNELS is empty**: no channel tiles under the header. Probably HA areas aren't fetched over WS (`config/area_registry/list` + `config/entity_registry/list`, or `device_registry` for area-by-device). The map is in my earlier R-107 area→entity post.
+3. Mason said (09:51) he's "still waiting for the glass". Tell us what he should see that's missing (room pads? wallpaper? glass panels?), so HANDS can verify each item on the device.
