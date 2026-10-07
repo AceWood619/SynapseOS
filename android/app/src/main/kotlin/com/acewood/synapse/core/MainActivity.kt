@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private lateinit var splash: LinearLayout
     private var home: HomeView? = null
     private var roomPad: RoomPadView? = null
+    private var haHomeChip: TextView? = null
     private var brightnessAnim: ValueAnimator? = null
     private var pageReady = false
     private lateinit var ambient: LinearLayout
@@ -362,7 +363,8 @@ class MainActivity : Activity() {
             home = HomeView(this, c,
                 onOpenRoom = { room -> showRoomPad(room) },
                 onMic = { openAssist() },
-                onHome = { showHome() }).also { h ->
+                onHome = { showHome() },
+                onHa = { showHa() }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
                 HaRepository.onChange { h.refresh() }
             }
@@ -374,6 +376,21 @@ class MainActivity : Activity() {
                 HaRepository.onChange { if (p.visibility == View.VISIBLE) p.refresh() }
             }
         }
+        if (haHomeChip == null) {
+            haHomeChip = TextView(this).apply {
+                text = "⌂  SYNAPSE"; textSize = 12f; setTextColor(Glass.INK); typeface = Glass.disp(this@MainActivity)
+                letterSpacing = 0.1f; gravity = Gravity.CENTER
+                background = Glass.panel(this@MainActivity, 999f, android.graphics.Color.argb(180, 10, 16, 36))
+                val padH = Glass.dp(this@MainActivity, 16f); val padV = Glass.dp(this@MainActivity, 9f)
+                setPadding(padH, padV, padH, padV)
+                visibility = View.GONE
+                setOnClickListener { try { performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}; showHome() }
+                root.addView(this, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply {
+                    topMargin = Glass.dp(this@MainActivity, 14f); rightMargin = Glass.dp(this@MainActivity, 14f)
+                })
+            }
+        }
         home?.refresh()
         showHome()
         hideSplash()
@@ -383,15 +400,16 @@ class MainActivity : Activity() {
     }
 
     private fun showHome() { home?.let { it.visibility = View.VISIBLE; it.bringToFront() }; web.visibility = View.GONE
-        roomPad?.visibility = View.GONE
+        roomPad?.visibility = View.GONE; haHomeChip?.visibility = View.GONE
         ambient.bringToFront(); splash.bringToFront() }
     private fun showRoomPad(room: com.acewood.synapse.logic.Room) {
         roomPad?.let { it.open(room); it.visibility = View.VISIBLE; it.bringToFront() }
-        home?.visibility = View.GONE; web.visibility = View.GONE
+        home?.visibility = View.GONE; web.visibility = View.GONE; haHomeChip?.visibility = View.GONE
         ambient.bringToFront(); splash.bringToFront()
     }
     private fun showHa() { web.visibility = View.VISIBLE; web.bringToFront(); home?.visibility = View.GONE
         roomPad?.visibility = View.GONE
+        haHomeChip?.let { it.visibility = View.VISIBLE; it.bringToFront() }
         ambient.bringToFront(); splash.bringToFront() }
     private fun openAssist() {
         try {

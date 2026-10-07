@@ -31,6 +31,7 @@ class HomeView(
     private val onOpenRoom: (Room) -> Unit,
     private val onMic: () -> Unit,
     private val onHome: () -> Unit,
+    private val onHa: () -> Unit = {},
 ) : FrameLayout(context) {
 
     private val g = Glass
@@ -87,7 +88,18 @@ class HomeView(
         addView(tv(12f, Glass.INK_DIM, g.disp(context)).apply { text = "SYNAPSE · HOME"; letterSpacing = 0.15f })
         addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
         addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
+        addView(haChip())
         addView(profilePill())
+    }
+
+    private fun haChip(): View = tv(11f, Glass.BLUE, g.disp(context)).apply {
+        text = "HA"; letterSpacing = 0.12f; gravity = Gravity.CENTER
+        background = g.tile(context, Glass.BLUE, false, 999f)
+        setPadding(g.dp(context, 12f), g.dp(context, 5f), g.dp(context, 12f), g.dp(context, 5f))
+        (layoutParams as? LinearLayout.LayoutParams ?: LinearLayout.LayoutParams(-2, -2)).let {
+            it.leftMargin = g.dp(context, 10f); layoutParams = it
+        }
+        setOnClickListener { haptic(); onHa() }
     }
 
     private fun profilePill(): View = g.row(context).apply {
