@@ -80,40 +80,40 @@ object RoomControl {
 
         val extraTiles = room.extras.map { id ->
             val e = cache.get(id)
-            ToggleTile(id, e?.friendlyName ?: pretty(id), e?.on ?: false, available(e))
+            ToggleTile(id, friendly(e?.friendlyName ?: pretty(id), room.name), e?.on ?: false, available(e))
         } + room.switches.map { id ->   // plain switches render as toggles too
             val e = cache.get(id)
-            ToggleTile(id, e?.friendlyName ?: pretty(id), e?.on ?: false, available(e))
+            ToggleTile(id, friendly(e?.friendlyName ?: pretty(id), room.name), e?.on ?: false, available(e))
         }
 
         return Model(
             room.id, room.name, lightTiles, ambiguous, mediaTiles, extraTiles,
-            fans = room.fans.map { fanTile(it, cache) },
-            covers = room.covers.map { coverTile(it, cache) },
-            climate = room.climate.map { climateTile(it, cache) },
-            locks = room.locks.map { lockTile(it, cache) },
-            sensors = room.sensors.mapNotNull { sensorTile(it, cache) },
+            fans = room.fans.map { fanTile(it, cache, room.name) },
+            covers = room.covers.map { coverTile(it, cache, room.name) },
+            climate = room.climate.map { climateTile(it, cache, room.name) },
+            locks = room.locks.map { lockTile(it, cache, room.name) },
+            sensors = room.sensors.mapNotNull { sensorTile(it, cache, room.name) },
         )
     }
 
-    private fun fanTile(id: String, cache: EntityCache): FanTile {
+    private fun fanTile(id: String, cache: EntityCache, roomName: String): FanTile {
         val e = cache.get(id)
         val feat = (e?.attrDouble("supported_features") ?: 0.0).toInt()
         val pct = e?.attrDouble("percentage")?.toInt()?.coerceIn(0, 100)
-        return FanTile(id, e?.friendlyName ?: pretty(id), e?.on ?: false, pct, has(feat, 1 /* SET_SPEED */), available(e))
+        return FanTile(id, friendly(e?.friendlyName ?: pretty(id), roomName), e?.on ?: false, pct, has(feat, 1 /* SET_SPEED */), available(e))
     }
 
-    private fun coverTile(id: String, cache: EntityCache): CoverTile {
+    private fun coverTile(id: String, cache: EntityCache, roomName: String): CoverTile {
         val e = cache.get(id)
         val feat = (e?.attrDouble("supported_features") ?: 0.0).toInt()
         val pos = e?.attrDouble("current_position")?.toInt()?.coerceIn(0, 100)
-        return CoverTile(id, e?.friendlyName ?: pretty(id), e?.state ?: "unavailable", pos, has(feat, 4 /* SET_POSITION */), available(e))
+        return CoverTile(id, friendly(e?.friendlyName ?: pretty(id), roomName), e?.state ?: "unavailable", pos, has(feat, 4 /* SET_POSITION */), available(e))
     }
 
-    private fun climateTile(id: String, cache: EntityCache): ClimateTile {
+    private fun climateTile(id: String, cache: EntityCache, roomName: String): ClimateTile {
         val e = cache.get(id)
         return ClimateTile(
-            id, e?.friendlyName ?: pretty(id), e?.state ?: "unavailable",
+            id, friendly(e?.friendlyName ?: pretty(id), roomName), e?.state ?: "unavailable",
             currentTemp = e?.attrDouble("current_temperature"),
             targetTemp = e?.attrDouble("temperature"),
             minTemp = e?.attrDouble("min_temp") ?: 50.0,
@@ -123,15 +123,15 @@ object RoomControl {
         )
     }
 
-    private fun lockTile(id: String, cache: EntityCache): LockTile {
+    private fun lockTile(id: String, cache: EntityCache, roomName: String): LockTile {
         val e = cache.get(id)
-        return LockTile(id, e?.friendlyName ?: pretty(id), e?.state == "locked", available(e))
+        return LockTile(id, friendly(e?.friendlyName ?: pretty(id), roomName), e?.state == "locked", available(e))
     }
 
-    private fun sensorTile(id: String, cache: EntityCache): SensorTile? {
-        val e = cache.get(id) ?: return SensorTile(id, pretty(id), "—", "")
+    private fun sensorTile(id: String, cache: EntityCache, roomName: String): SensorTile? {
+        val e = cache.get(id) ?: return SensorTile(id, friendly(pretty(id), roomName), "—", "")
         val unit = e.attributes["unit_of_measurement"] as? String ?: ""
-        return SensorTile(id, e.friendlyName, e.state, unit)
+        return SensorTile(id, friendly(e.friendlyName, roomName), e.state, unit)
     }
 
     private fun lightTile(rl: ResilientLight, cache: EntityCache): LightTile {
@@ -161,7 +161,7 @@ object RoomControl {
         val feat = (e?.attrDouble("supported_features") ?: 0.0).toInt()
         val vol = e?.attrDouble("volume_level")?.let { (it * 100).toInt().coerceIn(0, 100) }
         val title = (e?.attributes?.get("media_title") as? String)?.takeIf { it.isNotBlank() }
-            ?: e?.friendlyName ?: pretty(id)
+            ?: friendly(e?.friendlyName ?: pretty(id), room.name)
         val roku = isRoku(id, e)
         return MediaTile(
             entityId = id,
@@ -207,4 +207,15 @@ object RoomControl {
     private fun pretty(entityId: String): String =
         entityId.substringAfter('.').replace('_', ' ').split(' ')
             .filter { it.isNotBlank() }.joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+
+    private fun friendly(name: String, roomName: String): String {
+        val clean = name.trim().ifEmpty { "Device" }
+        val room = roomName.trim()
+        val initials = room.split(Regex("\\s+"))
+            .filter { it.isNotEmpty() }.joinToString("") { it.first().lowercase() }
+        val prefixes = listOf(room, initials).filter { it.length > 1 }
+        return prefixes.firstOrNull { clean.startsWith("$it ", ignoreCase = true) }
+            ?.let { clean.substring(it.length).trim().replaceFirstChar { c -> c.uppercase() } }
+            ?: clean
+    }
 }

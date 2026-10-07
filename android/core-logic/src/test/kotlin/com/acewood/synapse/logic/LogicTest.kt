@@ -741,3 +741,23 @@ class SensorOnlyAreaTest {
         assertEquals(listOf("living_room"), rooms.map { it.id })
     }
 }
+
+class RoomPadV3Test {
+    private fun cache(vararg e: Entity) = EntityCache().apply { applyStates(e.toList()) }
+
+    @Test fun listeningLightsAreNotRoomControls() {
+        val rooms = Rooms.build(listOf(Area("living_room", "Living Room", listOf(
+            "light.living_lamp", "light.living_listening_light"))))
+        assertEquals(listOf("light.living_lamp"), rooms.single().lights)
+    }
+
+    @Test fun friendlyNamesStripRoomPrefixAndInitials() {
+        val room = Rooms.build(listOf(Area("living_room", "Living Room", listOf(
+            "switch.living_lamp", "switch.lr_ceiling")))).single()
+        val model = RoomControl.build(room, cache(
+            Entity("switch.living_lamp", "off", mapOf("friendly_name" to "Living Room Lamp")),
+            Entity("switch.lr_ceiling", "off", mapOf("friendly_name" to "Lr Ceiling"))))
+        assertTrue(model.extras.any { it.name == "Lamp" })
+        assertTrue(model.extras.any { it.name == "Ceiling" })
+    }
+}

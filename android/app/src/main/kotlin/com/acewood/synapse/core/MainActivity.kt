@@ -523,7 +523,11 @@ class MainActivity : Activity() {
         }
         if (app.adminOnly) askPin { run() } else run()
     }
-    private fun showRoomPad(room: com.acewood.synapse.logic.Room) = showOverlay(roomPad) { it.open(room) }
+    private fun showRoomPad(room: com.acewood.synapse.logic.Room) = showOverlay(roomPad) {
+        val allowed = activeProfile?.layout?.rooms.orEmpty().map { it.lowercase() }.toSet()
+        val rooms = if (allowed.isEmpty()) HaRepository.rooms else HaRepository.rooms.filter { it.id.lowercase() in allowed }
+        it.open(room, rooms)
+    }
     private var haPathLoaded: String? = null
     private fun showHa(path: String? = null) {
         val c = cfg

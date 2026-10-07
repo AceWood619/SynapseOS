@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -34,6 +35,10 @@ class RoomPadView(
 
     private val g = Glass
     private var room: Room? = null
+    private var roomList: List<Room> = emptyList()
+    private var roomIndex = 0
+    private var downX = 0f
+    private var downY = 0f
     private var dragging = false   // don't rebuild under a finger on a slider
     private val bodyCol = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val title = tv(22f, Glass.INK, g.disp(context))
@@ -60,10 +65,42 @@ class RoomPadView(
             addView(key("‹  BACK", Glass.INK_DIM) { onBack() })
             addView(g.spacer(context, w = 14))
             addView(g.col(context).apply { addView(title); addView(subtitle) })
+            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            addView(key("‹", Glass.INK_DIM) { switchRoom(-1) })
+            addView(g.spacer(context, w = 6))
+            addView(key("›", Glass.INK_DIM) { switchRoom(1) })
         })
         outer.addView(g.spacer(context, h = 12))
         outer.addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(bodyCol) },
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+    }
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { downX = event.x; downY = event.y }
+            MotionEvent.ACTION_MOVE -> {
+                if (dragging) return false   // a slider is being dragged: horizontal moves belong to it
+                val dx = event.x - downX; val dy = event.y - downY
+                if (kotlin.math.abs(dx) > g.dp(context, 55f) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.25f) return true
+            }
+        }
+        return false
+    }
+
+    /** After a horizontal swipe is intercepted, the rest of the gesture lands here: switch on release. */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_UP) {
+            val dx = event.x - downX
+            if (kotlin.math.abs(dx) > g.dp(context, 55f)) switchRoom(if (dx < 0) 1 else -1)
+        }
+        return true
+    }
+
+    private fun switchRoom(delta: Int) {
+        if (roomList.isEmpty()) return
+        val next = (roomIndex + delta).coerceIn(0, roomList.lastIndex)
+        if (next != roomIndex) { roomIndex = next; room = roomList[next]; lastSig = null; refresh(); haptic() }
     }
 
     private fun tv(size: Float, color: Int, tf: Typeface) = TextView(context).apply {
@@ -73,7 +110,11 @@ class RoomPadView(
     private fun cacheTargets(t: RoomControl.LightTile) =
         HaRepository.cache?.let { t.light.commandTargets(it, both = false) } ?: t.light.entityIds
 
-    fun open(r: Room) { room = r; lastSig = null; refresh() }
+    fun open(r: Room, rooms: List<Room> = listOf(r)) {
+        roomList = if (rooms.isEmpty()) listOf(r) else rooms
+        roomIndex = roomList.indexOfFirst { it.id == r.id }.coerceAtLeast(0)
+        room = roomList[roomIndex]; lastSig = null; refresh()
+    }
 
     private var lastSig: String? = null
 
@@ -98,7 +139,7 @@ class RoomPadView(
             if (sig == lastSig) return@post
             lastSig = sig
             val m = RoomControl.build(r, cache)
-            title.text = r.name
+            title.text = "CH ${roomIndex + 1} · ${r.name}"
             subtitle.text = buildString {
                 val parts = mutableListOf<String>()
                 if (m.lightCount > 0) parts += "${m.lightCount} ${if (m.lightCount == 1) "light" else "lights"}"
@@ -115,7 +156,10 @@ class RoomPadView(
             section("FANS", m.fans.map { fanCard(it) })
             section("COVERS", m.covers.map { coverCard(it) })
             section("LOCKS", m.locks.map { lockCard(it) })
-            section("SWITCHES", m.extras.map { toggleCard(it) })
+            val (settings, switches) = m.extras.partition { it.entityId.contains("ivy", true) ||
+                it.name.contains("alert", true) || it.name.contains("ding", true) || it.name.contains("motion", true) }
+            section("SWITCHES", switches.map { toggleCard(it) })
+            if (settings.isNotEmpty()) addCard(settingsFold(settings))
             if (m.sensors.isNotEmpty()) { sectionLabel("SENSORS"); addCard(sensorWrap(m.sensors)) }
             if (bodyCol.childCount == 0)
                 bodyCol.addView(tv(13f, Glass.INK_FAINT, g.body(context)).apply { text = "No controls in this room yet" })
@@ -150,7 +194,9 @@ class RoomPadView(
         if (t.isOn && t.dimmable) {
             addView(g.spacer(context, h = 10))
             addView(slider(t.brightnessPct ?: 50, 100, Glass.AMBER) { pct ->
-                HaRepository.callService("light", "turn_on", cacheTargets(t), mapOf("brightness_pct" to pct))
+                val targets = cacheTargets(t)
+                HaRepository.optimisticAttribute(targets, "brightness", (pct * 255 / 100).coerceIn(1, 255))
+                HaRepository.callService("light", "turn_on", targets, mapOf("brightness_pct" to pct))
             })
         }
         if (t.isOn && t.colorCapable) {
@@ -203,6 +249,7 @@ class RoomPadView(
                 addView(tv(11f, Glass.INK_FAINT, g.disp(context)).apply { text = "VOL" })
                 addView(g.spacer(context, w = 10))
                 addView(slider(vol, 100, Glass.MINT) { pct ->
+                    HaRepository.optimisticAttribute(listOf(t.entityId), "volume_level", pct / 100.0)
                     HaRepository.callService("media_player", "volume_set", listOf(t.entityId), mapOf("volume_level" to pct / 100.0))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             })
@@ -258,6 +305,7 @@ class RoomPadView(
             addView(slider(cur, 100, Glass.RED) { pct ->
                 val temp = t.minTemp + (pct / 100.0) * span
                 val stepped = (Math.round(temp / t.step) * t.step)
+                HaRepository.optimisticAttribute(listOf(t.entityId), "temperature", stepped)
                 HaRepository.callService("climate", "set_temperature", listOf(t.entityId), mapOf("temperature" to stepped))
             })
         }
@@ -277,6 +325,7 @@ class RoomPadView(
         if (t.isOn && t.supportsSpeed) {
             addView(g.spacer(context, h = 10))
             addView(slider(t.speedPct ?: 50, 100, Glass.MINT) { pct ->
+                HaRepository.optimisticAttribute(listOf(t.entityId), "percentage", pct)
                 HaRepository.callService("fan", "set_percentage", listOf(t.entityId), mapOf("percentage" to pct))
             })
         }
@@ -299,6 +348,7 @@ class RoomPadView(
         if (t.supportsPosition && pos != null) {
             addView(g.spacer(context, h = 10))
             addView(slider(pos, 100, Glass.BLUE) { pct ->
+                HaRepository.optimisticAttribute(listOf(t.entityId), "current_position", pct)
                 HaRepository.callService("cover", "set_cover_position", listOf(t.entityId), mapOf("position" to pct))
             })
         }
@@ -327,6 +377,18 @@ class RoomPadView(
             val domain = t.entityId.substringBefore('.')
             HaRepository.callService(domain, if (t.isOn) "turn_off" else "turn_on", listOf(t.entityId)); refresh()
         })
+    }
+
+    private fun settingsFold(items: List<RoomControl.ToggleTile>): View = g.col(context).apply {
+        background = g.panel(context, 16f)
+        val details = g.col(context).apply { visibility = View.GONE }
+        addView(tv(13f, Glass.INK_DIM, g.disp(context)).apply {
+            text = "⚙  SETTINGS  ·  Ivy alerts"
+            setPadding(g.dp(context, 14f), g.dp(context, 13f), 0, g.dp(context, 13f))
+            tap { details.visibility = if (details.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
+        })
+        items.forEach { details.addView(toggleCard(it)); details.addView(g.spacer(context, h = 6)) }
+        addView(details)
     }
 
     // ---------- SENSORS (read-only, compact) ----------

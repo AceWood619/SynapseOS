@@ -57,6 +57,20 @@ object HaRepository {
         client?.callService(domain, service, entityIds, data)
     }
 
+    /** Update a displayed HA attribute immediately; the next HA state event remains authoritative. */
+    fun optimisticAttribute(entityIds: List<String>, key: String, value: Any?) {
+        val c = cache ?: return
+        if (client?.connected != true) return
+        var changed = false
+        for (id in entityIds) {
+            val e = c.get(id) ?: continue
+            val attrs = e.attributes.toMutableMap()
+            attrs[key] = value
+            c.applyStateChanged(e.copy(attributes = attrs)); changed = true
+        }
+        if (changed) notifyChanged()
+    }
+
     fun converse(text: String, conversationId: String?, onReply: (String, String?) -> Unit) {
         val c = client
         if (c == null) onReply("Home Assistant isn't connected right now.", conversationId) else c.converse(text, conversationId, onReply)

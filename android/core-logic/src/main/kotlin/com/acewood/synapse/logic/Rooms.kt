@@ -53,7 +53,7 @@ object Rooms {
     }
 
     private fun toRoom(a: Area, cfg: RoomsConfig): Room {
-        var lights = a.entities.filter { it.startsWith("light.") }
+        var lights = a.entities.filter { it.startsWith("light.") && !it.endsWith("_listening_light") }
         if (cfg.hideCloudTwins) {
             val hasLocal = lights.any { !it.contains("zz_cloud") }
             if (hasLocal) lights = lights.filterNot { it.contains("zz_cloud") }
