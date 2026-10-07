@@ -83,7 +83,7 @@ class HaWsClient(
                 ws?.send(HaWs.getStatesMessage(id.getAndIncrement()))
             }
             is HaWs.Frame.AuthInvalid -> { lastError = "auth invalid: ${f.message}"; closed = true; ws?.close(1000, "auth") }
-            is HaWs.Frame.Result -> { if (f.states != null) { cache.applyStates(f.states); onChange() } }
+            is HaWs.Frame.Result -> { val st = f.states; if (st != null) { cache.applyStates(st); onChange() } }
             is HaWs.Frame.StateChanged -> { cache.applyStateChanged(f.entity); onChange() }
             else -> {}
         }

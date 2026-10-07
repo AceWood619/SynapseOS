@@ -4,4 +4,7 @@ java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaV
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 val repo = rootDir.parentFile.absolutePath
 sourceSets["main"].kotlin.srcDirs("$repo/app/src/main/kotlin", "$repo/core-logic/src/main/kotlin")
-dependencies { compileOnly("org.robolectric:android-all:14-robolectric-10818077") }
+dependencies {
+    compileOnly("org.robolectric:android-all:14-robolectric-10818077")
+    compileOnly("com.squareup.okhttp3:okhttp:4.12.0")   // keep in sync with app/build.gradle.kts (catches okhttp smart-cast / API bugs locally)
+}
