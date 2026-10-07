@@ -1,0 +1,87 @@
+name: synapse-core
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  # A newer push supersedes older queued builds; only the newest APK needs publishing.
+  group: synapse-core
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests + release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew --no-daemon :core-logic:test :app:assembleRelease 2>&1 | tee build.log
+
+      - name: Show compiler errors
+        if: failure()
+        working-directory: android
+        run: |
+          grep -E "^e: |error:|FAILED|What went wrong" -A3 build.log | head -80 || true
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: android/core-logic/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: synapse-core-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      # HANDS pulls builds/ with plain git, so publish the APK onto main.
+      # Race-proof: stash the APK outside the tree, hard-reset to the live main,
+      # lay the APK back, commit only builds/, push with loud retries.
+      - name: Publish APK to builds/
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -e
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+          cp "$apk" "$RUNNER_TEMP/synapse.apk"
+          base=$(grep -oE 'versionName = "[0-9]+\.[0-9]+' android/app/build.gradle.kts | grep -oE '[0-9]+\.[0-9]+' | head -1)
+          ver="${base:-0.0}.${GITHUB_RUN_NUMBER}"
+          git config user.name  "synapse-ci"
+          git config user.email "synapse-ci@users.noreply.github.com"
+          pushed=0
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main      # discard any build/renormalization noise in the tree
+            mkdir -p builds
+            cp "$RUNNER_TEMP/synapse.apk" builds/synapse-core-latest.apk
+            sha=$(sha256sum builds/synapse-core-latest.apk | cut -d' ' -f1)
+            printf '{"app":"synapse-core","version":"%s","sha256":"%s","commit":"%s","built":"%s"}\n' \
+              "$ver" "$sha" "$GITHUB_SHA" "$(date -u +%FT%TZ)" > builds/synapse-core-latest.json
+            git add builds/synapse-core-latest.apk builds/synapse-core-latest.json
+            if git diff --cached --quiet; then echo "builds/ already current"; pushed=1; break; fi
+            git commit -q -m "CI: synapse-core $ver [skip ci]"
+            if git push origin HEAD:main; then echo "published $ver"; pushed=1; break; fi
+            echo "push attempt $i rejected; retrying"; sleep $((i * 5))
+          done
+          if [ "$pushed" != 1 ]; then echo "::error::failed to publish APK after 5 attempts"; exit 1; fi
