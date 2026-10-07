@@ -10,10 +10,11 @@ _Last updated: 2026-10-07 09:25 PDT (HANDS)_
 - **Known pain:** Power tap within 5 s each boot (R-101, won't fix). Zadig WinUSB on 0E8D:201C → stock fastboot.exe can't see LK; fastbootd (18D1:4EE0) still uses stock fastboot.exe.
 
 ## BRAIN (research / code chat)
-_Last updated: 2026-10-07 16:05 UTC (BRAIN)._
-- **R-107 foundations done (all tested, 38 tests):** HA WebSocket + EntityCache; multi-user Profiles/roles; **Rooms model from your real HA areas** (kitchen + empty skipped, zz_cloud twins hidden, Roku=D-pad).
-- **Design:** "Synapse Glass" language + live prototype published to Mason (`design/synapse-glass/`).
-- **Wireless access** from dining PC / MacBook / RP5: `tools/remote-access/` (authorize each ADB key).
-- **Noting:** recovery path is PROVEN (HANDS restored stock super.img this morning) → permanent install is now a real option for Mason, though DSU is fine.
-- **Next (BRAIN):** OkHttp HaWsClient (wire the live data), then build the Synapse Glass home screen + room pads + PIN/profile switch in Views.
-- **Need from Mason:** reaction to the Synapse Glass look; room order; keep/hide the zz_cloud twins.
+_Last updated: 2026-10-07 16:45 UTC (BRAIN)._
+- **NATIVE GLASS HOME SCREEN IS BUILT.** HomeView.kt renders the native dashboard (greeting + live hero, lights/media summary, smart-ordered room "channels", HA scenes, Home·mic·All-off thumb console) in Views, Glass-styled, haptic, optimistic scene/all-off over the WS. MainActivity shows it as the default page; the HA Lovelace web page is now just the "HA" tab.
+- **Live data layer done & building:** `HaWsClient` (OkHttp WebSocket, auth, reconnect backoff) + `HaRepository` singleton feeding the UI. Fixed a cross-module smart-cast that broke CI runs 21 & 22; **run 23 (commit 6907577) is building now** — APK will carry the native home screen.
+- Added okhttp to `compile-check` so this bug class is caught locally, not in CI.
+- **R-107 foundations (tested):** HA WebSocket + EntityCache; multi-user Profiles/roles; Rooms model from Mason's real HA areas; RoomOrder (smart ordering); ResilientLight (local+cloud failover, one switch).
+- **Next (BRAIN):** verify run 23 green → hand APK to HANDS to install + screenshot. Then room-pad swipe (room-as-channel), media D-pad, PIN/profile lock screen, launcher/app-drawer.
+- **➡️ HANDS:** once run 23 is green, pull `builds/synapse-core-latest.apk`, install on the phone, and screenshot the new native home screen for Mason (this is his #1: "it's not on the phone yet"). Config now has `roomOrder` (empty = auto smart order; fine to leave empty).
+- **Need from Mason:** reaction to the native home screen on-device; master-bedroom twin-light mapping; logo approval.
