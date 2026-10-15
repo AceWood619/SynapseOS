@@ -25,8 +25,11 @@ object Glass {
 
     fun dp(ctx: Context, v: Float): Int = (v * ctx.resources.displayMetrics.density).toInt()
 
-    /** The dark radial ground for the whole screen. */
-    fun ground(): GradientDrawable = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+    /** The Synapse Glass wallpaper for full-screen views (ground + static constellation, cached). */
+    fun ground(): android.graphics.drawable.Drawable = GlassWallpaper()
+
+    /** The dark radial ground alone (wallpaper base / fallback). */
+    fun plainGround(): GradientDrawable = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
         intArrayOf(GROUND0, GROUND1, GROUND2)).apply {
         gradientType = GradientDrawable.RADIAL_GRADIENT; gradientRadius = 1400f
         setGradientCenter(0.5f, 0.12f)
