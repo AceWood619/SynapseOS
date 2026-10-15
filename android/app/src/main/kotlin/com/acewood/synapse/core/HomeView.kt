@@ -305,7 +305,7 @@ class HomeView(
         append(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)).append(HaRepository.connected).append(HaRepository.rooms.size)
         if (cache == null) return@buildString
         cache.byDomain("light").forEach { append(it.entityId).append(it.state) }
-        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]).append(it.attributes["entity_picture"]).append(it.attributes["volume_level"]) }
+        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]).append(it.attributes["entity_picture"]).append(it.attributes["volume_level"]).append(it.attributes["is_volume_muted"]) }
         cache.byDomain("scene").forEach { append(it.entityId) }
         cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
         cache.byDomain("timer").forEach { append(it.entityId).append(it.state).append(it.attributes["remaining"]).append(it.attributes["duration"]) }
@@ -378,7 +378,24 @@ class HomeView(
                 })
             })
         }
-        HaRepository.rooms.firstOrNull { it.media.contains(p.entityId) }?.let { room ->
+        // Shared volume/mute gate: same caps (incl. Roku remote fallback) as the room pad.
+        val npRoom = HaRepository.rooms.firstOrNull { it.media.contains(p.entityId) }
+        val caps = cache?.let { com.acewood.synapse.logic.RoomControl.capsFor(p.entityId, HaRepository.rooms, it) } ?: p.caps
+        if (caps.showVolumeKeys || caps.showMute) {
+            nowPlayingCard.addView(g.row(context).apply {
+                gravity = Gravity.CENTER
+                if (caps.showVolumeKeys) addView(nowKey("VOL −") { caps.volumeDown(p.entityId)?.let { sendMedia(it) } })
+                if (caps.showMute) {
+                    val label = if (caps.exactMute && p.isMuted) "UNMUTE" else "MUTE"
+                    addView(nowKey(label, if (caps.exactMute && p.isMuted) Glass.RED else Glass.INK_DIM) {
+                        if (caps.exactMute) HaRepository.optimisticAttribute(listOf(p.entityId), "is_volume_muted", !p.isMuted)
+                        caps.mute(p.entityId, !p.isMuted)?.let { sendMedia(it) }
+                    })
+                }
+                if (caps.showVolumeKeys) addView(nowKey("VOL +", Glass.MINT) { caps.volumeUp(p.entityId)?.let { sendMedia(it) } })
+            })
+        }
+        npRoom?.let { room ->
             nowPlayingCard.addView(tv(11f, Glass.BLUE, g.disp(context)).apply {
                 text = "TV REMOTE  ·  ${room.name}"; gravity = Gravity.CENTER
                 setPadding(0, g.dp(context, 7f), 0, g.dp(context, 3f)); tap { onOpenRoom(room) }

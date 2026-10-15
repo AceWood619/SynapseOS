@@ -31,6 +31,8 @@ object RoomControl {
         val appName: String? = null,
         val canVolumeStep: Boolean = false,
         val canMute: Boolean = false,
+        /** Shared volume/mute capability + call builder (see [MediaCaps]). */
+        val caps: MediaCaps = MediaCaps.NONE,
     )
 
     data class ToggleTile(val entityId: String, val name: String, val isOn: Boolean, val available: Boolean)
@@ -70,10 +72,7 @@ object RoomControl {
 
     // HA MediaPlayerEntityFeature bits we care about.
     private const val FEAT_PAUSE = 1
-    private const val FEAT_VOLUME_SET = 4
-    private const val FEAT_VOLUME_MUTE = 8
     private const val FEAT_NEXT = 32
-    private const val FEAT_VOLUME_STEP = 1024
     private const val FEAT_PLAY = 16384
 
     fun build(room: Room, cache: EntityCache): Model {
@@ -167,22 +166,36 @@ object RoomControl {
         val title = (e?.attributes?.get("media_title") as? String)?.takeIf { it.isNotBlank() }
             ?: friendly(e?.friendlyName ?: pretty(id), room.name)
         val roku = isRoku(id, e)
+        val remote = pickRemote(id, room, roku)
+        // Roku ECP volume keys are only valid on a Roku remote; never send them to another remote type.
+        val volumeRemote = remote?.takeIf { roku || it.contains("roku", true) }
+        val caps = MediaCaps.of(e, volumeRemote)
         return MediaTile(
             entityId = id,
-            remoteEntityId = pickRemote(id, room, roku),
+            remoteEntityId = remote,
             title = title,
             state = e?.state ?: "unavailable",
             isPlaying = e?.state == "playing",
             isMuted = e?.attributes?.get("is_volume_muted") == true,
-            volumePct = if (has(feat, FEAT_VOLUME_SET) || has(feat, FEAT_VOLUME_STEP)) vol else null,
+            volumePct = if (caps.volumeSet) vol else null,
             canTransport = has(feat, FEAT_PLAY) || has(feat, FEAT_PAUSE) || has(feat, FEAT_NEXT),
             showDpad = roku || room.remotes.isNotEmpty(),
             albumArt = e?.attributes?.get("entity_picture") as? String,
             appName = e?.attributes?.get("app_name") as? String,
-            canVolumeStep = has(feat, FEAT_VOLUME_STEP),
-            canMute = has(feat, FEAT_VOLUME_MUTE),
+            canVolumeStep = caps.showVolumeKeys,
+            canMute = caps.showMute,
+            caps = caps,
         )
     }
+
+    /**
+     * Volume/mute caps for any player, wherever it is shown: uses its room (so a Roku remote can back
+     * the keys) when the player belongs to one, else the player's own features.
+     */
+    fun capsFor(entityId: String, rooms: List<Room>, cache: EntityCache): MediaCaps =
+        rooms.firstOrNull { it.media.contains(entityId) }
+            ?.let { room -> mediaTile(entityId, room, cache).caps }
+            ?: MediaCaps.of(cache.get(entityId))
 
     /** Choose the remote.* that drives this media player's D-pad: a roku-matching remote, else the room's first. */
     private fun pickRemote(mediaId: String, room: Room, roku: Boolean): String? {
