@@ -28,6 +28,8 @@ class HaWsClient(
     private val onAreas: (List<Area>) -> Unit = {},
     /** Live-link changes (true = authenticated, false = dropped). Called from OkHttp threads. */
     private val onConnection: (Boolean) -> Unit = {},
+    /** persistent_notification/subscribe events: (current|added|updated|removed, notifications by id). */
+    private val onNotices: (String, Map<String, Any?>?) -> Unit = { _, _ -> },
 ) {
     @Volatile var connected = false; private set
     @Volatile var lastError: String? = null; private set
@@ -50,6 +52,7 @@ class HaWsClient(
     private var areaReqId = -1L
     private var entityReqId = -1L
     private var deviceReqId = -1L
+    @Volatile private var noticeReqId = -1L
     private var areaRows: List<Map<String, Any?>>? = null
     private var entityRows: List<Map<String, Any?>>? = null
     private var deviceRows: List<Map<String, Any?>>? = null
@@ -142,6 +145,7 @@ class HaWsClient(
                 areaReqId = id.getAndIncrement();   ws?.send(HaWs.listAreasMessage(areaReqId))
                 entityReqId = id.getAndIncrement(); ws?.send(HaWs.listEntitiesMessage(entityReqId))
                 deviceReqId = id.getAndIncrement(); ws?.send(HaWs.listDevicesMessage(deviceReqId))
+                noticeReqId = id.getAndIncrement(); ws?.send(com.acewood.synapse.logic.SystemNotices.subscribeMessage(noticeReqId))
             }
             is HaWs.Frame.AuthInvalid -> { lastError = "auth invalid: ${f.message}"; closed = true; connecting = false; ws?.close(1000, "auth") }
             is HaWs.Frame.Result -> {
@@ -157,7 +161,10 @@ class HaWsClient(
                 }
             }
             is HaWs.Frame.StateChanged -> { cache.applyStateChanged(f.entity); onChange() }
-            is HaWs.Frame.AssistEvent -> if (f.id == assistRunId) {
+            is HaWs.Frame.AssistEvent -> if (f.id == noticeReqId && noticeReqId >= 0) {
+                @Suppress("UNCHECKED_CAST")
+                onNotices(f.eventType, f.raw?.get("notifications") as? Map<String, Any?>)
+            } else if (f.id == assistRunId) {
                 if (f.eventType == "error") Log.w(SynapseApp.TAG, "HA Assist error: ${f.data}")
                 // HA puts the binary handler id in the run-start event (runner_data), not in the result.
                 if (f.eventType == "run-start") {
@@ -187,6 +194,12 @@ class HaWsClient(
     fun callService(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap()) {
         if (!authed || entityIds.isEmpty()) return
         ws?.send(HaWs.callServiceMessage(id.getAndIncrement(), domain, service, data, mapOf("entity_id" to entityIds)))
+    }
+
+    /** A service call with data but no entity target (e.g. persistent_notification.dismiss). */
+    fun callServiceData(domain: String, service: String, data: Map<String, Any?>) {
+        if (!authed) return
+        ws?.send(HaWs.callServiceMessage(id.getAndIncrement(), domain, service, data))
     }
 
     fun callServiceWithResponse(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap(), onResult: (Map<String, Any?>?) -> Unit) {

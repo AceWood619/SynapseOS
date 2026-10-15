@@ -52,7 +52,16 @@ class HomeView(
     private val onSwitchProfile: () -> Unit = {},
     private val onIntercom: () -> Unit = {},
     private val onWeather: () -> Unit = {},
+    /** Admin notices badge tapped (R-124 Part 4). */
+    private val onNotices: () -> Unit = {},
 ) : FrameLayout(context) {
+    /** Small amber count on the profile pill when there are unseen system notices (admins only). */
+    private val noticeBadge = TextView(context).apply {
+        textSize = 9.5f; setTextColor(Color.parseColor("#1a1000")); typeface = Glass.disp(context); gravity = Gravity.CENTER
+        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Glass.AMBER) }
+        visibility = View.GONE
+        tap { onNotices() }
+    }
     private val pillInitial = TextView(context)
     private val pillRole = TextView(context)
     private var profileName: String = cfg.ownerName.trim()
@@ -194,7 +203,20 @@ class HomeView(
         addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
         addView(jarvisChip)
         addView(haChip())
-        addView(profilePill())
+        addView(FrameLayout(context).apply {
+            clipChildren = false; clipToPadding = false
+            addView(profilePill())
+            val s = g.dp(context, 18f)
+            // Sits on the pill's top-right corner, inside the bounds (the status row clips overflow).
+            addView(noticeBadge, LayoutParams(s, s, Gravity.TOP or Gravity.END))
+        })
+    }
+
+    /** 0 hides the badge. Callers pass 0 for non-admin profiles. */
+    fun setNoticeCount(count: Int) {
+        if (count <= 0) { noticeBadge.visibility = View.GONE; return }
+        noticeBadge.text = if (count > 9) "9+" else count.toString()
+        noticeBadge.visibility = View.VISIBLE
     }
 
     /** Jarvis kill switch: the HA helpers that let Jarvis listen and act. */

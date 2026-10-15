@@ -60,6 +60,7 @@ class MainActivity : Activity() {
     private var audioView: AudioView? = null
     private var diagnosticsView: DiagnosticsView? = null
     private var weatherView: WeatherView? = null
+    private var noticesView: NoticesView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -77,6 +78,8 @@ class MainActivity : Activity() {
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 diagnosticsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 weatherView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                noticesView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                updateNoticeBadge()
                 jarvisView?.let { if (it.visibility == View.VISIBLE) it.open() }
                 if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             }, 350)
@@ -412,7 +415,8 @@ class MainActivity : Activity() {
                 onSwitchProfile = { switchProfile() },
                 onJarvisSwitch = { live -> jarvisKillSwitch(live) },
                 onIntercom = { showOverlay(intercomView) { it.open() } },
-                onWeather = { showOverlay(weatherView) { it.open() } }).also { h ->
+                onWeather = { showOverlay(weatherView) { it.open() } },
+                onNotices = { askPin { showOverlay(noticesView) { it.open() } } }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
@@ -452,6 +456,11 @@ class MainActivity : Activity() {
         }
         if (weatherView == null) {
             weatherView = WeatherView(this, onBack = { showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (noticesView == null) {
+            noticesView = NoticesView(this, onBack = { showHome() }).also { v ->
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
@@ -556,6 +565,17 @@ class MainActivity : Activity() {
     private fun applyProfileToHome() {
         val p = activeProfile ?: return
         home?.setProfile(p)
+        updateNoticeBadge()
+    }
+
+    /** R-124 Part 4: unseen HA notifications + pending updates, shown to admin profiles only. */
+    private fun updateNoticeBadge() {
+        val h = home ?: return
+        val admin = activeProfile?.role == com.acewood.synapse.logic.Role.ADMIN || profiles == null
+        if (!admin) { h.setNoticeCount(0); return }
+        val keys = com.acewood.synapse.logic.SystemNotices.keys(HaRepository.notices.list(),
+            com.acewood.synapse.logic.SystemNotices.updates(HaRepository.cache))
+        h.setNoticeCount(com.acewood.synapse.logic.SystemNotices.unseenCount(keys, NoticeSeenStore.seen(this)))
     }
 
     private fun showProfileLock() {
@@ -578,13 +598,13 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; noticesView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }
         hideOverlays(); home?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
         haHomeChip?.visibility = View.GONE
-        linkStrip?.bringToFront(); applyLinkUi()
+        linkStrip?.bringToFront(); applyLinkUi(); updateNoticeBadge()
         ambient.bringToFront(); splash.bringToFront() }
     /** Show one full-screen Synapse overlay (sensors, Jarvis, app drawer) over the home screen. */
     private fun <T : View> showOverlay(v: T?, prepare: (T) -> Unit = {}) {
@@ -603,6 +623,7 @@ class MainActivity : Activity() {
                     "audio" -> showOverlay(audioView) { it.open() }
                     "sensors" -> showOverlay(sensorsView) { it.open() }
                     "diagnostics" -> showOverlay(diagnosticsView) { it.open() }
+                    "notices" -> showOverlay(noticesView) { it.open() }
                     "ha" -> showHa()
                     "music" -> showHa("/media-browser/browser")
                     "browser" -> startActivity(Intent(this, BrowserActivity::class.java))

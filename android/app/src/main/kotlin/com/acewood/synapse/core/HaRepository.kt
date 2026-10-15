@@ -36,6 +36,8 @@ object HaRepository {
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "synapse-snapshot").apply { isDaemon = true } }
     /** Shared link model the screen reads for the offline strip. Guarded by `this`. */
     val link = LinkStatus()
+    /** R-124 Part 4: HA persistent notifications (kept fresh by the WS subscription). */
+    val notices = com.acewood.synapse.logic.NoticeBook()
 
     val cache: EntityCache? get() = client?.cache
     val connected: Boolean get() = client?.connected == true
@@ -75,6 +77,7 @@ object HaRepository {
                 schedule.markDirty(); maybeSave(force = true)
                 notifyChanged()
             },
+            onNotices = { type, items -> if (notices.apply(type, items)) notifyChanged() },
             onConnection = { up ->
                 synchronized(this) { link.update(up, System.currentTimeMillis()) }
                 if (!up) maybeSave(force = true)
@@ -123,7 +126,7 @@ object HaRepository {
     @Synchronized
     fun stop() {
         client?.stop(); client = null; config = null; rooms = emptyList(); hourlyForecast = null; dailyForecast = null
-        lastAreas = emptyList(); synchronized(this) { link.update(false, System.currentTimeMillis()) }
+        lastAreas = emptyList(); notices.clear(); synchronized(this) { link.update(false, System.currentTimeMillis()) }
     }
 
     /** Rooms the native UI shows; set once we have HA areas (from the WS registry or a pushed map). */
@@ -144,6 +147,13 @@ object HaRepository {
             "turn_off" -> if (domain in OPTIMISTIC_DOMAINS) optimistic(entityIds, "off")
         }
         client?.callService(domain, service, entityIds, data)
+    }
+
+    /** Dismiss an HA persistent notification (admin notices screen). Removed locally at once; HA's `removed` event confirms. */
+    fun dismissNotice(id: String) {
+        if (!connected) { blocked(); return }
+        if (notices.remove(id)) notifyChanged()
+        client?.callServiceData("persistent_notification", "dismiss", com.acewood.synapse.logic.SystemNotices.dismissData(id))
     }
 
     /** Update a displayed HA attribute immediately; the next HA state event remains authoritative. */

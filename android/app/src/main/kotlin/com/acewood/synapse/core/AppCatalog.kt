@@ -40,6 +40,7 @@ object AppCatalog {
         App("Audio", "♫", Target.Internal("audio")),
         App("Sensors", "≋", Target.Internal("sensors")),
         App("Room diagnostics", "⌁", Target.Internal("diagnostics"), adminOnly = true),
+        App("System notices", "⚑", Target.Internal("notices"), adminOnly = true),
         App("Home Assistant", "⌂", Target.Internal("ha")),
         App("Music", "♫", Target.Internal("music")),
         App("Synapse Browser", "◍", Target.Internal("browser")),
