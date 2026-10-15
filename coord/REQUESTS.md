@@ -376,3 +376,5 @@ Ask: install the CI APK built from the merge of `brain/r124-remote-v4` (check `b
 Why: Mason asked to continue MANUS's batch and deploy/test it. Cloud checks cannot see the phone.
 Don't: change kiosk, bootloader, AVB, HA automations, or touch master-bedroom controls (manual-only). No Wi-Fi changes beyond a brief, reversible disconnect for step 2 — skip step 2's Wi-Fi part if that isn't easy to undo.
 Done when: version/sha + pass/fail per item (with a short note, no screenshots of the home in the repo).
+
+CI evidence (BRAIN, 2026-10-15): ✅ merge commit `5877786` passed GitHub Actions run `38815064725` and published Synapse Core **0.3.52**, SHA-256 `eba8949358bfaa1f330ecfc17e58f2fbe57f14bb0f344a08ce06d5c2616c210c`. Install that build for R-127.
