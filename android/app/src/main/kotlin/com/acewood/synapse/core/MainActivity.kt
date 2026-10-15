@@ -303,6 +303,7 @@ class MainActivity : Activity() {
     private fun applyMode() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
         NodeBus.screenMode = if (amb) "ambient" else "active"
+        home?.setOrbRunning(!amb)
         if (amb) {
             if (HaRepository.hourlyForecast == null) HaRepository.requestForecast("hourly")
             ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)

@@ -65,3 +65,29 @@ class SystemNoticesTest {
         assertEquals("Title\n\nBody", SystemNotices.plain("## Title\n\n\n\n`Body`"))
     }
 }
+
+class FrameBudgetTest {
+    private val ms = 1_000_000L
+    @Test fun warmupAndOccasionalSlowFramesDoNotTrip() {
+        val b = FrameBudget()
+        repeat(10) { assertTrue(b.record(80 * ms)) }        // warmup ignored
+        repeat(200) { i -> b.record(if (i % 10 == 0) 40 * ms else 9 * ms) }   // 10% slow
+        assertFalse(b.tripped)
+    }
+    @Test fun sustainedJankTripsAndStaysTripped() {
+        val b = FrameBudget()
+        repeat(10) { b.record(5 * ms) }
+        var running = true
+        repeat(30) { running = b.record(35 * ms) }
+        assertFalse(running); assertTrue(b.tripped)
+        assertFalse(b.record(1 * ms))
+    }
+    @Test fun orbGeometryStaysInsideTheView() {
+        for (t in listOf(0.0, 1.3, 17.0, 999.9)) {
+            val nodes = NeuronOrb.nodes(t)
+            assertEquals(6, nodes.size)
+            nodes.forEach { n -> assertTrue(kotlin.math.abs(n.x) <= 1f && kotlin.math.abs(n.y) <= 1f && n.glow in 0f..1f) }
+            assertTrue(NeuronOrb.pulse(t) in 0f..1f)
+        }
+    }
+}

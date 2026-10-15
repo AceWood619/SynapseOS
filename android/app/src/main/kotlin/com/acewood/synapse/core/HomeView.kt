@@ -62,6 +62,9 @@ class HomeView(
         visibility = View.GONE
         tap { onNotices() }
     }
+    private val heroOrb = NeuronOrbView(context)
+    /** Ambient covers the home screen without hiding it, so the host must pause the orb explicitly. */
+    fun setOrbRunning(running: Boolean) = heroOrb.setRunning(running)
     private val pillInitial = TextView(context)
     private val pillRole = TextView(context)
     private var profileName: String = cfg.ownerName.trim()
@@ -258,10 +261,9 @@ class HomeView(
     private fun hero(): View = g.row(context).apply {
         background = g.panel(context, 20f)
         setPadding(g.dp(context, 16f), g.dp(context, 15f), g.dp(context, 16f), g.dp(context, 15f))
-        addView(TextView(context).apply {
-            text = "◉"; textSize = 26f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Glass.BLUE, Glass.INDIGO)).apply { shape = GradientDrawable.OVAL }
-            val s = g.dp(context, 56f); layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 14f) }
+        // R-124 Part 6: animated neuron orb (≈12 fps, paused off-screen/ambient, frame-time gated).
+        addView(heroOrb.apply {
+            val sz = g.dp(context, 60f); layoutParams = LinearLayout.LayoutParams(sz, sz).apply { rightMargin = g.dp(context, 12f) }
         })
         addView(g.col(context).apply { addView(greeting); addView(summary); addView(nowPlaying); addView(nowPlayingCard) },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
