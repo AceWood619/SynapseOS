@@ -24,6 +24,8 @@ All notable SynapseOS changes are recorded here. Device verification is separate
 - `cd android/compile-check && ../gradlew :appmod:compileKotlin`
 - `git diff --check`
 
+CI run `38808495526` passed on merged commit `c25ce9c` and published Synapse Core **0.3.50** with SHA-256 `f4dadf7ed542540f301e4a42eb4e7eead6bafcec3929c0d20ae0b32a2c4fd7de`. HANDS still owns installation and on-device verification. CI reported only action-runtime/setup-java and future `ubuntu-latest` image migration warnings.
+
 ## R-124 Part 2
 
 - Added HA `weather.get_forecasts` return-response framing and normalized forecast parsing.
