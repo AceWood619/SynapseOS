@@ -152,6 +152,13 @@ class HaWsClient(
         ws?.send(HaWs.callServiceMessage(id.getAndIncrement(), domain, service, data, mapOf("entity_id" to entityIds)))
     }
 
+    fun callServiceWithResponse(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap(), onResult: (Map<String, Any?>?) -> Unit) {
+        if (!authed || entityIds.isEmpty()) { onResult(null); return }
+        val rid = id.getAndIncrement()
+        pending[rid] = { result -> onResult(if (result.success) result.obj else null) }
+        ws?.send(HaWs.callServiceResponseMessage(rid, domain, service, data, mapOf("entity_id" to entityIds)))
+    }
+
     /** Send text to HA Assist (Jarvis). onReply gets (speech, conversationId) or an error string. */
     fun converse(text: String, conversationId: String?, onReply: (String, String?) -> Unit) {
         if (!authed) { onReply("Home Assistant isn't connected right now.", conversationId); return }

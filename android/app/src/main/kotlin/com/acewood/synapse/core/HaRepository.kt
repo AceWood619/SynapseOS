@@ -6,6 +6,8 @@ import com.acewood.synapse.logic.NodeConfig
 import com.acewood.synapse.logic.Room
 import com.acewood.synapse.logic.Rooms
 import com.acewood.synapse.logic.RoomsConfig
+import com.acewood.synapse.logic.WeatherForecast
+import com.acewood.synapse.logic.WeatherForecastParser
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
@@ -16,6 +18,8 @@ object HaRepository {
     @Volatile private var client: HaWsClient? = null
     @Volatile var config: NodeConfig? = null; private set
     @Volatile var rooms: List<Room> = emptyList(); private set
+    @Volatile var hourlyForecast: WeatherForecast? = null; private set
+    @Volatile var dailyForecast: WeatherForecast? = null; private set
     private val listeners = CopyOnWriteArraySet<() -> Unit>()
 
     val cache: EntityCache? get() = client?.cache
@@ -38,7 +42,7 @@ object HaRepository {
     }
 
     @Synchronized
-    fun stop() { client?.stop(); client = null; config = null; rooms = emptyList() }
+    fun stop() { client?.stop(); client = null; config = null; rooms = emptyList(); hourlyForecast = null; dailyForecast = null }
 
     /** Rooms the native UI shows; set once we have HA areas (from the WS registry or a pushed map). */
     fun setRooms(areas: List<com.acewood.synapse.logic.Area>, cfg: RoomsConfig = RoomsConfig()) {
@@ -82,6 +86,15 @@ object HaRepository {
     }
     fun sendAssistAudio(handlerId: Int, pcm: ByteArray) { client?.sendAssistAudio(handlerId, pcm) }
     fun stopAssist() { client?.stopAssist() }
+
+    fun requestForecast(kind: String, onDone: () -> Unit = {}) {
+        val weather = cache?.byDomain("weather")?.firstOrNull() ?: run { onDone(); return }
+        client?.callServiceWithResponse("weather", "get_forecasts", listOf(weather.entityId), mapOf("type" to kind)) { response ->
+            val parsed = WeatherForecastParser.parse(response, kind)
+            if (kind == "hourly") hourlyForecast = parsed else if (kind == "daily") dailyForecast = parsed
+            notifyChanged(); onDone()
+        } ?: onDone()
+    }
 
     /** Select the hand-picked room, set the discovered message helper, then run the HA script. */
     fun sendIntercom(target: IntercomTarget, room: String, message: String): Boolean {

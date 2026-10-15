@@ -59,6 +59,26 @@ class LightingFxTest {
         assertNull(LightingFx.holidayApplyId(cache))
     }
 }
+class WeatherForecastTest {
+    @Test fun parsesHourlyReturnResponseEnvelope() {
+        val result = mapOf<String, Any?>("response" to mapOf<String, Any?>(
+            "weather.home" to mapOf<String, Any?>("forecast" to listOf(
+                mapOf<String, Any?>("datetime" to "2026-10-15T21:00:00-07:00", "condition" to "partlycloudy", "temperature" to 72.0, "precipitation_probability" to 10.0)
+            )
+        )))
+        val parsed = WeatherForecastParser.parse(result, "hourly")!!
+        assertEquals("weather.home", parsed.entityId)
+        assertEquals("partlycloudy", parsed.points.single().condition)
+        assertEquals(72.0, parsed.points.single().temperature)
+        assertEquals("21:00", WeatherForecastParser.shortTime(parsed.points.single().time))
+    }
+
+    @Test fun requestsReturnResponse() {
+        val msg = HaWs.callServiceResponseMessage(4, "weather", "get_forecasts", mapOf("type" to "hourly"), mapOf("entity_id" to listOf("weather.home")))
+        assertTrue(msg.contains("\"return_response\":true"))
+        assertTrue(msg.contains("get_forecasts"))
+    }
+}
 class NodeConfigTest {
     private val good = """{"node_id":"Living Room 01","room":"Living Room","ha_url":"http://homeassistant.local:8123/",
         "ha_token":"abcdefghijklmnopqrstuvwxyz0123","api_key":"0123456789abcdef","pin":"2468"}"""

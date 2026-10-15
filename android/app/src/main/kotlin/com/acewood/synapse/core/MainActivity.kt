@@ -58,6 +58,7 @@ class MainActivity : Activity() {
     private var intercomView: IntercomView? = null
     private var audioView: AudioView? = null
     private var diagnosticsView: DiagnosticsView? = null
+    private var weatherView: WeatherView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -73,8 +74,9 @@ class MainActivity : Activity() {
                 roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 diagnosticsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                weatherView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 jarvisView?.let { if (it.visibility == View.VISIBLE) it.open() }
-                if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile)
+                if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             }, 350)
         }
     }
@@ -244,7 +246,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Back is handled inside the dashboard")
     override fun onBackPressed() {
-        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, audioView, drawerView).any { it?.visibility == View.VISIBLE }
+        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, audioView, weatherView, drawerView).any { it?.visibility == View.VISIBLE }
         when {
             overlayOpen -> showHome()
             web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
@@ -287,7 +289,8 @@ class MainActivity : Activity() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
         NodeBus.screenMode = if (amb) "ambient" else "active"
         if (amb) {
-            ambient.refresh(HaRepository.cache, cfg, activeProfile)
+            if (HaRepository.hourlyForecast == null) HaRepository.requestForecast("hourly")
+            ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             ambient.visibility = View.VISIBLE
             ambient.bringToFront()
             hideSystemBars()                                  // nav bar can reappear on relayout; re-hide it
@@ -390,7 +393,8 @@ class MainActivity : Activity() {
                 onLaunch = { app -> launchApp(app) },
                 onSwitchProfile = { switchProfile() },
                 onJarvisSwitch = { live -> jarvisKillSwitch(live) },
-                onIntercom = { showOverlay(intercomView) { it.open() } }).also { h ->
+                onIntercom = { showOverlay(intercomView) { it.open() } },
+                onWeather = { showOverlay(weatherView) { it.open() } }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
@@ -424,6 +428,11 @@ class MainActivity : Activity() {
         }
         if (diagnosticsView == null) {
             diagnosticsView = DiagnosticsView(this, onBack = { showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (weatherView == null) {
+            weatherView = WeatherView(this, onBack = { showHome() }).also { v ->
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
@@ -504,7 +513,7 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }
