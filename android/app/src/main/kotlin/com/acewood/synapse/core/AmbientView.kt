@@ -13,6 +13,8 @@ import com.acewood.synapse.logic.AmbientData
 import com.acewood.synapse.logic.EntityCache
 import com.acewood.synapse.logic.NodeConfig
 import com.acewood.synapse.logic.Profile
+import com.acewood.synapse.logic.WeatherForecast
+import com.acewood.synapse.logic.WeatherForecastParser
 
 /** Low-power ambient face. MainActivity owns the burn-in-safe pixel shift and brightness ramp. */
 class AmbientView(context: Context, private val onSwitchProfile: () -> Unit) : LinearLayout(context) {
@@ -23,6 +25,7 @@ class AmbientView(context: Context, private val onSwitchProfile: () -> Unit) : L
     private val nowWrap = g.col(context).apply { visibility = View.GONE }
     private val profileKey = label(11f, Glass.BLUE)
     private val roomKey = label(11f, Glass.INK_FAINT)
+    private val hourly = g.row(context).apply { gravity = Gravity.CENTER; visibility = View.GONE }
 
     init {
         orientation = VERTICAL; gravity = Gravity.CENTER
@@ -46,14 +49,25 @@ class AmbientView(context: Context, private val onSwitchProfile: () -> Unit) : L
             setPadding(g.dp(context, 15f), g.dp(context, 9f), g.dp(context, 15f), g.dp(context, 9f)); tap { onSwitchProfile() }
         })
         addView(roomKey.apply { setPadding(0, g.dp(context, 12f), 0, 0) })
+        addView(hourly)
     }
 
-    fun refresh(cache: EntityCache?, cfg: NodeConfig?, profile: Profile?) {
+    fun refresh(cache: EntityCache?, cfg: NodeConfig?, profile: Profile?, forecast: WeatherForecast? = null) {
         val snap = AmbientData.snapshot(cache)
         weather.text = snap.weather ?: "Weather unavailable"
         timer.text = snap.timer?.let { "⏱  ${it.name}: ${it.remaining}" } ?: "No active timers"
         profileKey.text = "PROFILE  ·  ${profile?.name ?: "Choose profile"}"
         roomKey.text = cfg?.let { "●  ${it.room.uppercase()}" } ?: ""
+        hourly.removeAllViews()
+        if (forecast?.points.isNullOrEmpty()) hourly.visibility = View.GONE else {
+            hourly.visibility = View.VISIBLE
+            forecast!!.hourly(6).forEach { p ->
+                hourly.addView(label(10f, Glass.INK_DIM).apply {
+                    text = "${WeatherForecastParser.shortTime(p.time)}  ${p.temperature?.let { "${Math.round(it)}°" } ?: "—"}"
+                    setPadding(g.dp(context, 7f), g.dp(context, 8f), g.dp(context, 7f), 0)
+                })
+            }
+        }
         nowWrap.removeAllViews()
         val p = snap.nowPlaying
         if (p == null) { nowWrap.visibility = View.GONE; return }

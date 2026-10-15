@@ -33,6 +33,13 @@ object HaWs {
         return Json.write(m)
     }
 
+    fun callServiceResponseMessage(id: Long, domain: String, service: String, data: Map<String, Any?>, target: Map<String, Any?>? = null): String {
+        val m = linkedMapOf<String, Any?>("id" to id, "type" to "call_service", "domain" to domain, "service" to service, "return_response" to true)
+        if (data.isNotEmpty()) m["service_data"] = data
+        if (target != null) m["target"] = target
+        return Json.write(m)
+    }
+
     /** Ask HA's conversation agent (Assist / Jarvis) something in plain text. */
     fun conversationMessage(id: Long, text: String, conversationId: String? = null, agentId: String? = null): String {
         val m = linkedMapOf<String, Any?>("id" to id, "type" to "conversation/process", "text" to text, "language" to "en")

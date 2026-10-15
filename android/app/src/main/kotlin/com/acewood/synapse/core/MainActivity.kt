@@ -34,6 +34,7 @@ import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
+import java.util.Calendar
 import com.acewood.synapse.logic.IdleController
 import com.acewood.synapse.logic.Json
 import com.acewood.synapse.logic.NodeConfig
@@ -58,6 +59,7 @@ class MainActivity : Activity() {
     private var intercomView: IntercomView? = null
     private var audioView: AudioView? = null
     private var diagnosticsView: DiagnosticsView? = null
+    private var weatherView: WeatherView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -73,8 +75,9 @@ class MainActivity : Activity() {
                 roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 diagnosticsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                weatherView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 jarvisView?.let { if (it.visibility == View.VISIBLE) it.open() }
-                if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile)
+                if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             }, 350)
         }
     }
@@ -244,7 +247,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Back is handled inside the dashboard")
     override fun onBackPressed() {
-        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, audioView, drawerView).any { it?.visibility == View.VISIBLE }
+        val overlayOpen = listOf(roomPad, sensorsView, jarvisView, intercomView, audioView, weatherView, drawerView).any { it?.visibility == View.VISIBLE }
         when {
             overlayOpen -> showHome()
             web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
@@ -275,6 +278,7 @@ class MainActivity : Activity() {
                 ambient.animate().translationX(Random.nextInt(-dp(30), dp(30)).toFloat())
                     .translationY(Random.nextInt(-dp(40), dp(40)).toFloat())
                     .setDuration(2_000).setInterpolator(DecelerateInterpolator()).start()
+                applyAmbientBrightness()
             }
             if (cfg == null && tickCount % 10 == 0L && ConfigStore.importIfPresent(this@MainActivity)) {
                 NodeBus.send(NodeBus.Command.CONFIG_CHANGED)
@@ -287,12 +291,13 @@ class MainActivity : Activity() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
         NodeBus.screenMode = if (amb) "ambient" else "active"
         if (amb) {
-            ambient.refresh(HaRepository.cache, cfg, activeProfile)
+            if (HaRepository.hourlyForecast == null) HaRepository.requestForecast("hourly")
+            ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             ambient.visibility = View.VISIBLE
             ambient.bringToFront()
             hideSystemBars()                                  // nav bar can reappear on relayout; re-hide it
             ambient.animate().alpha(1f).setDuration(500).setInterpolator(DecelerateInterpolator()).start()
-            rampBrightness(cfg?.ambientBrightness ?: 0.02f, clearAfter = false, durationMs = 700)
+            applyAmbientBrightness(700)
         } else {
             ambient.animate().alpha(0f).setDuration(350).withEndAction {
                 if (idle.mode != IdleController.Mode.AMBIENT) ambient.visibility = View.GONE
@@ -323,6 +328,12 @@ class MainActivity : Activity() {
             })
             start()
         }
+    }
+
+    private fun applyAmbientBrightness(durationMs: Long = 300) {
+        val c = Calendar.getInstance()
+        val settings = PanelSettingsStore.load(this)
+        rampBrightness(settings.effectiveAmbientBrightness(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE)), clearAfter = false, durationMs = durationMs)
     }
 
     // ---------- hidden settings entry: 5 taps in the top-left corner within 3 s ----------
@@ -375,7 +386,7 @@ class MainActivity : Activity() {
             val last = ProfileStore.lastProfileId(this)
             activeProfile = profiles?.list?.firstOrNull { it.id == last }
         }
-        idle.idleMs = c.idleSeconds * 1000L
+        idle.idleMs = PanelSettingsStore.load(this).idleSeconds * 1000L
         // Native Glass home (default). HA Lovelace stays loaded underneath as the "HA" tab.
         if (home == null) {
             home = HomeView(this, c,
@@ -390,7 +401,8 @@ class MainActivity : Activity() {
                 onLaunch = { app -> launchApp(app) },
                 onSwitchProfile = { switchProfile() },
                 onJarvisSwitch = { live -> jarvisKillSwitch(live) },
-                onIntercom = { showOverlay(intercomView) { it.open() } }).also { h ->
+                onIntercom = { showOverlay(intercomView) { it.open() } },
+                onWeather = { showOverlay(weatherView) { it.open() } }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
@@ -424,6 +436,11 @@ class MainActivity : Activity() {
         }
         if (diagnosticsView == null) {
             diagnosticsView = DiagnosticsView(this, onBack = { showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (weatherView == null) {
+            weatherView = WeatherView(this, onBack = { showHome() }).also { v ->
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
@@ -504,7 +521,7 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }

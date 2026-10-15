@@ -51,6 +51,7 @@ class HomeView(
     private val onLaunch: (AppCatalog.App) -> Unit = {},
     private val onSwitchProfile: () -> Unit = {},
     private val onIntercom: () -> Unit = {},
+    private val onWeather: () -> Unit = {},
 ) : FrameLayout(context) {
     private val pillInitial = TextView(context)
     private val pillRole = TextView(context)
@@ -189,7 +190,7 @@ class HomeView(
         })
         addView(tv(12f, Glass.INK_DIM, g.disp(context)).apply { text = "SYNAPSE"; letterSpacing = 0.15f })
         addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
-        addView(weatherChip.apply { setPadding(0, 0, g.dp(context, 10f), 0) })
+        addView(weatherChip.apply { setPadding(0, 0, g.dp(context, 10f), 0); tap { onWeather() } })
         addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
         addView(jarvisChip)
         addView(haChip())

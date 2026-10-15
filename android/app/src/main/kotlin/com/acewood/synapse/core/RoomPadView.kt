@@ -107,7 +107,10 @@ class RoomPadView(
     private fun tv(size: Float, color: Int, tf: Typeface) = TextView(context).apply {
         textSize = size; setTextColor(color); typeface = tf
     }
-    private fun haptic() = try { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}
+    private fun haptic() {
+        if (!PanelSettingsStore.load(context).hapticsEnabled) return
+        try { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}
+    }
     private fun cacheTargets(t: RoomControl.LightTile) =
         HaRepository.cache?.let { t.light.commandTargets(it, both = false) } ?: t.light.entityIds
 

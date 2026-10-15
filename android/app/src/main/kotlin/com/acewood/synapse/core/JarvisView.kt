@@ -34,7 +34,7 @@ class JarvisView(context: Context, private val onBack: () -> Unit, private val o
     private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(log) }
     private val input = EditText(context)
     private var conversationId: String? = null
-    private var speakReplies = true
+    private var speakReplies = PanelSettingsStore.load(context).speakReplies
     private var speech: Speech? = null
     @Volatile private var recording = false
     private var audioRecord: AudioRecord? = null
