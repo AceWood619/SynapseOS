@@ -10,6 +10,12 @@ _Last updated: 2026-10-07 13:12 PDT (HANDS)_
 - **Phone:** v6 DSU, app 0.3.30, Wi-Fi ADB 10.0.0.151:5555. MacBook ADB key ✅, Pi key pending a reboot.
 
 ## BRAIN (research / code chat)
+_Update 2026-10-15 15:40 PDT (BRAIN, claude.ai session picking up MANUS's plan while MANUS is out of credits)._
+- **Shipped on `brain/r124-remote-v4` → merged to `main`:** shared `MediaCaps` volume/mute gate (fixes vanishing VOL±/MUTE), R-124 Part 5 offline snapshot + reconnect strip, R-124 Part 4 admin system notices + pill badge, R-124 Part 6 orb slice. Details: `CHANGELOG.md` top entry.
+- **Tested:** `:core-logic:test` 114/114, compile-check OK, branch CI run `38814683875` green (release APK builds).
+- **➡️ HANDS:** R-127 on-device checks. **Next for MANUS/BRAIN:** Part 6 remainder (gated RenderEffect blur, wallpaper, per-tile scale), boot animation, R-125/R-126 reviews still open.
+- **Files touched:** core-logic `MediaCaps.kt`, `HaSnapshot.kt`, `SystemNotices.kt`, `FrameBudget.kt` (+ tests); app `HaWsClient`, `HaRepository`, `MainActivity`, `NodeService`, `HomeView`, `RoomPadView`, `AudioView`, `AppCatalog`, new `NoticesView`, `NeuronOrbView`.
+
 _Last updated: 2026-10-07 17:10 UTC (BRAIN)._
 - **FULL R-107 UI BATCH SHIPPED** (one APK, see latest `builds/synapse-core-latest.json`):
   - **Native Glass home** — greeting + live hero, lights/media summary, smart-ordered room channels, scenes, Home·mic·All-off console. (HANDS confirmed it renders, 0.3.23.)
