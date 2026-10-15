@@ -80,7 +80,10 @@ object HaWs {
                           val obj: Map<String, Any?>? = null) : Frame()
         /** A state_changed event carrying the entity's new state (null if the entity was removed). */
         data class StateChanged(val entity: Entity?) : Frame()
-        data class AssistEvent(val id: Long, val eventType: String, val data: Map<String, Any?>?) : Frame()
+        /** Any subscription event other than state_changed, matched by request id. [raw] is the whole
+         *  `event` object (persistent_notification/subscribe puts its payload there, not in `data`). */
+        data class AssistEvent(val id: Long, val eventType: String, val data: Map<String, Any?>?,
+                               val raw: Map<String, Any?>? = null) : Frame()
         object Pong : Frame()
         data class Other(val type: String) : Frame()
     }
@@ -109,7 +112,7 @@ object HaWs {
                     Frame.StateChanged(Entity.fromState(data?.get("new_state") as? Map<String, Any?>))
                 } else {
                     val id = (m["id"] as? Double)?.toLong() ?: -1
-                    Frame.AssistEvent(id, event?.get("type") as? String ?: "event", event?.get("data") as? Map<String, Any?>)
+                    Frame.AssistEvent(id, event?.get("type") as? String ?: "event", event?.get("data") as? Map<String, Any?>, event)
                 }
             }
             else -> Frame.Other(m["type"] as? String ?: "unknown")

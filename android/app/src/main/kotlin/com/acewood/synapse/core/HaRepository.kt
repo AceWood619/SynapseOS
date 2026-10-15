@@ -8,7 +8,13 @@ import com.acewood.synapse.logic.Rooms
 import com.acewood.synapse.logic.RoomsConfig
 import com.acewood.synapse.logic.WeatherForecast
 import com.acewood.synapse.logic.WeatherForecastParser
+import com.acewood.synapse.logic.HaSnapshot
+import com.acewood.synapse.logic.HaSnapshotCodec
+import com.acewood.synapse.logic.LinkStatus
+import com.acewood.synapse.logic.SnapshotSchedule
+import java.io.File
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.Executors
 
 /**
  * Process-wide live HA state for the native UI. NodeService owns the connection; the dashboard
@@ -21,6 +27,17 @@ object HaRepository {
     @Volatile var hourlyForecast: WeatherForecast? = null; private set
     @Volatile var dailyForecast: WeatherForecast? = null; private set
     private val listeners = CopyOnWriteArraySet<() -> Unit>()
+    private val blockedListeners = CopyOnWriteArraySet<() -> Unit>()
+
+    // ---- R-124 Part 5: offline snapshot + link status ----
+    @Volatile private var storageDir: File? = null
+    @Volatile private var lastAreas: List<com.acewood.synapse.logic.Area> = emptyList()
+    private val schedule = SnapshotSchedule(60_000)
+    private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "synapse-snapshot").apply { isDaemon = true } }
+    /** Shared link model the screen reads for the offline strip. Guarded by `this`. */
+    val link = LinkStatus()
+    /** R-124 Part 4: HA persistent notifications (kept fresh by the WS subscription). */
+    val notices = com.acewood.synapse.logic.NoticeBook()
 
     val cache: EntityCache? get() = client?.cache
     val connected: Boolean get() = client?.connected == true
@@ -29,20 +46,88 @@ object HaRepository {
 
     fun onChange(l: () -> Unit) { listeners.add(l) }
     fun removeListener(l: () -> Unit) { listeners.remove(l) }
+    /** Fired when a control was pressed while offline and therefore not sent. */
+    fun onBlocked(l: () -> Unit) { blockedListeners.add(l) }
+    fun removeBlocked(l: () -> Unit) { blockedListeners.remove(l) }
+
+    /** Where the last-known-state snapshot lives (app-private). Call before [start]; idempotent. */
+    fun attachStorage(dir: File) { if (storageDir == null) storageDir = dir }
+    private fun snapshotFile(): File? = storageDir?.let { File(it, "ha_snapshot.json") }
+
+    /** Network back / RETRY tapped / screen woke: try now instead of waiting out the backoff. */
+    fun reconnectNow() { client?.reconnectNow() }
 
     @Synchronized
     fun start(cfg: NodeConfig) {
         if (config == cfg && client != null) return
         client?.stop()
         config = cfg
-        client = HaWsClient(cfg, onChange = { notifyChanged() }, onAreas = { areas ->
-            setRooms(areas, RoomsConfig(order = cfg.roomOrder))
-            notifyChanged()
-        }).also { it.start() }
+        val seeded = EntityCache()
+        loadSnapshot(cfg)?.let { snap ->
+            seeded.applyStates(snap.entities)
+            lastAreas = snap.areas
+            if (snap.areas.isNotEmpty()) setRooms(snap.areas, RoomsConfig(order = cfg.roomOrder))
+            synchronized(this) { link.showingSnapshot(snap.savedAtMs) }
+        }
+        client = HaWsClient(cfg, cache = seeded,
+            onChange = { schedule.markDirty(); maybeSave(); notifyChanged() },
+            onAreas = { areas ->
+                lastAreas = areas
+                setRooms(areas, RoomsConfig(order = cfg.roomOrder))
+                schedule.markDirty(); maybeSave(force = true)
+                notifyChanged()
+            },
+            onNotices = { type, items -> if (notices.apply(type, items)) notifyChanged() },
+            onConnection = { up ->
+                synchronized(this) { link.update(up, System.currentTimeMillis()) }
+                if (!up) maybeSave(force = true)
+                notifyChanged()
+            }).also { it.start() }
+        notifyChanged()
     }
 
+    private fun loadSnapshot(cfg: NodeConfig): HaSnapshot? {
+        val f = snapshotFile() ?: return null
+        return runCatching {
+            if (!f.isFile || f.length() > HaSnapshotCodec.MAX_BYTES) null
+            else HaSnapshotCodec.decode(f.readText(), cfg.haUrl)
+        }.getOrNull()
+    }
+
+    /**
+     * Write the snapshot off the UI thread. Routine saves happen only while live, at most once a
+     * minute and only if something changed. [force] (areas just loaded / link just dropped) bypasses
+     * the minute but is still capped at one per 10 s; the cache at drop time is the last live picture.
+     */
+    private fun maybeSave(force: Boolean = false) {
+        val f = snapshotFile() ?: return
+        val c = client ?: return
+        val cfg = config ?: return
+        if (c.cache.size() == 0) return
+        val now = System.currentTimeMillis()
+        synchronized(schedule) {
+            if (force) {
+                if (now - lastForcedMs < 10_000) { schedule.markDirty(); return }
+                lastForcedMs = now
+            } else if (!schedule.shouldSave(c.connected, now)) return
+            schedule.saved(now)
+        }
+        val snap = HaSnapshot(now, HaSnapshotCodec.source(cfg.haUrl), lastAreas, c.cache.all())
+        io.execute {
+            runCatching {
+                val tmp = File(f.parentFile, f.name + ".tmp")
+                tmp.writeText(HaSnapshotCodec.encode(snap))
+                if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+            }.onFailure { android.util.Log.w(SynapseApp.TAG, "snapshot save failed: ${it.message}") }
+        }
+    }
+    private var lastForcedMs = 0L
+
     @Synchronized
-    fun stop() { client?.stop(); client = null; config = null; rooms = emptyList(); hourlyForecast = null; dailyForecast = null }
+    fun stop() {
+        client?.stop(); client = null; config = null; rooms = emptyList(); hourlyForecast = null; dailyForecast = null
+        lastAreas = emptyList(); notices.clear(); synchronized(this) { link.update(false, System.currentTimeMillis()) }
+    }
 
     /** Rooms the native UI shows; set once we have HA areas (from the WS registry or a pushed map). */
     fun setRooms(areas: List<com.acewood.synapse.logic.Area>, cfg: RoomsConfig = RoomsConfig()) {
@@ -51,15 +136,24 @@ object HaRepository {
 
     /** Toggle with an optimistic local update, so the key lights up instantly; HA's own echo confirms it. */
     fun toggle(entityIds: List<String>, on: Boolean) {
+        if (!connected) { blocked(); return }
         optimistic(entityIds, if (on) "on" else "off")
         client?.toggle(entityIds, on)
     }
     fun callService(domain: String, service: String, entityIds: List<String>, data: Map<String, Any?> = emptyMap()) {
+        if (!connected) { blocked(); return }
         when (service) {
             "turn_on" -> if (domain in OPTIMISTIC_DOMAINS) optimistic(entityIds, "on")
             "turn_off" -> if (domain in OPTIMISTIC_DOMAINS) optimistic(entityIds, "off")
         }
         client?.callService(domain, service, entityIds, data)
+    }
+
+    /** Dismiss an HA persistent notification (admin notices screen). Removed locally at once; HA's `removed` event confirms. */
+    fun dismissNotice(id: String) {
+        if (!connected) { blocked(); return }
+        if (notices.remove(id)) notifyChanged()
+        client?.callServiceData("persistent_notification", "dismiss", com.acewood.synapse.logic.SystemNotices.dismissData(id))
     }
 
     /** Update a displayed HA attribute immediately; the next HA state event remains authoritative. */
@@ -126,4 +220,5 @@ object HaRepository {
     }
 
     private fun notifyChanged() { listeners.forEach { runCatching { it() } } }
+    private fun blocked() { blockedListeners.forEach { runCatching { it() } } }
 }

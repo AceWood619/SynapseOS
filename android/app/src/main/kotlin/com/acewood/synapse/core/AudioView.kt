@@ -10,6 +10,8 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import com.acewood.synapse.logic.Entity
+import com.acewood.synapse.logic.MediaCaps
+import com.acewood.synapse.logic.RoomControl
 
 class AudioView(context: Context, private val onBack: () -> Unit, private val onMusic: () -> Unit) : FrameLayout(context) {
     private val g = Glass
@@ -49,6 +51,7 @@ class AudioView(context: Context, private val onBack: () -> Unit, private val on
     }
 
     private fun playerCard(e: Entity): View = g.col(context).apply {
+        val caps = HaRepository.cache?.let { RoomControl.capsFor(e.entityId, HaRepository.rooms, it) } ?: MediaCaps.of(e)
         background = g.panel(context, 17f); setPadding(g.dp(context, 14f), g.dp(context, 12f), g.dp(context, 14f), g.dp(context, 12f))
         addView(g.row(context).apply {
             addView(g.col(context).apply {
@@ -56,22 +59,31 @@ class AudioView(context: Context, private val onBack: () -> Unit, private val on
                 addView(TextView(context).apply { text = e.state; textSize = 11f; setTextColor(if (e.state == "playing") Glass.MINT else Glass.INK_DIM) })
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(button("⏯", Glass.MINT) { service("media_play_pause", e) })
-            addView(g.spacer(context, w = 6)); addView(button("MUTE", Glass.INK_DIM) { service("volume_mute", e, mapOf("is_volume_muted" to (e.attributes["is_volume_muted"] != true))) })
+            if (caps.showMute) {
+                val muted = caps.exactMute && e.attributes["is_volume_muted"] == true
+                addView(g.spacer(context, w = 6)); addView(button(if (muted) "UNMUTE" else "MUTE", if (muted) Glass.RED else Glass.INK_DIM) {
+                    if (caps.exactMute) HaRepository.optimisticAttribute(listOf(e.entityId), "is_volume_muted", !muted)
+                    caps.mute(e.entityId, !muted)?.let { call(it) }
+                })
+            }
         })
         val volume = e.attrDouble("volume_level")?.let { (it * 100).toInt().coerceIn(0, 100) }
-        if (volume != null) {
+        if (caps.showVolumeKeys || (caps.volumeSet && volume != null)) {
             addView(g.spacer(context, h = 8))
             addView(g.row(context).apply {
-                addView(button("−", Glass.BLUE) { service("volume_down", e) })
-                addView(SeekBar(context).apply {
+                if (caps.showVolumeKeys) addView(button("−", Glass.BLUE) { caps.volumeDown(e.entityId)?.let { call(it) } })
+                if (caps.volumeSet && volume != null) addView(SeekBar(context).apply {
                     max = 100; progress = volume; layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
                     setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {}
                         override fun onStartTrackingTouch(bar: SeekBar) {}
                         override fun onStopTrackingTouch(bar: SeekBar) { service("volume_set", e, mapOf("volume_level" to bar.progress / 100.0)) }
                     })
+                }) else addView(TextView(context).apply {
+                    text = "VOLUME"; textSize = 10f; setTextColor(Glass.INK_FAINT); gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
                 })
-                addView(button("+", Glass.MINT) { service("volume_up", e) })
+                if (caps.showVolumeKeys) addView(button("+", Glass.MINT) { caps.volumeUp(e.entityId)?.let { call(it) } })
             })
         }
         @Suppress("UNCHECKED_CAST")
@@ -89,6 +101,10 @@ class AudioView(context: Context, private val onBack: () -> Unit, private val on
         }
     }
 
+    private fun call(c: com.acewood.synapse.logic.HaCall) {
+        HaRepository.callService(c.domain, c.service, listOf(c.entityId), c.data)
+        postDelayed({ render() }, 350)
+    }
     private fun service(name: String, entity: Entity, data: Map<String, Any?> = emptyMap()) {
         HaRepository.callService("media_player", name, listOf(entity.entityId), data)
         postDelayed({ render() }, 350)

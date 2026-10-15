@@ -2,6 +2,32 @@
 
 All notable SynapseOS changes are recorded here. Device verification is separate from local build verification and is attributed to HANDS in `coord/REQUESTS.md`.
 
+## Unreleased — Media gate fix + R-124 Parts 4, 5, 6 (orb) — BRAIN, 2026-10-15
+
+Picks up MANUS's last plan (MANUS out of credits). Branch `brain/r124-remote-v4`, merged to `main`.
+
+### Fixed
+
+- **Volume/mute keys disappearing.** Each screen checked `supported_features` itself and required VOLUME_STEP (1024). Home Assistant accepts `volume_up`/`volume_down` for VOLUME_SET *or* VOLUME_STEP (`media_player/services.py`), so most speakers lost working keys. New shared `MediaCaps` gate is used by the Home now-playing card, Room Pad, and Audio app. The slider now needs VOLUME_SET (step-only Rokus reject `volume_set`). Roku rooms fall back to `remote.send_command` VolumeUp/Down/Mute when the player lacks the bits.
+- Audio app no longer shows MUTE on players that cannot mute.
+
+### Added
+
+- **Home now-playing card:** VOL − / MUTE / VOL + row.
+- **R-124 Part 5 — offline + resilience:** last-known state snapshot in app-private storage (sanitized: no `entity_picture`, tokens, or `token=` URLs), loaded before HA connects so a reboot shows the house immediately; amber "Offline · reconnecting" strip (tap = retry now); HA screens fade to 55% while offline; controls pressed offline are refused with on-screen feedback instead of silently dropped; reconnect skips backoff when Wi-Fi returns or the screen resumes; pending Jarvis/forecast requests fail cleanly on drop.
+- **R-124 Part 4 — system notices (admin):** HA persistent notifications via `persistent_notification/subscribe` with DISMISS; pending `update.*` entities listed (no install button); amber count badge on the profile pill for admin profiles; admin-only "System notices" in More.
+- **R-124 Part 6 (orb slice):** animated neuron hero orb, ≈12 fps, paused in ambient/off-screen, frozen by a FrameMetrics budget if >20% of frames exceed 20 ms.
+
+### Not done yet
+
+- R-124 Part 6 remainder: RenderEffect blur (none added), Glass wallpaper, per-tile profile scale. Boot animation bonus.
+
+### Verification
+
+- `:core-logic:test` 114/114 (29 new), `compile-check :appmod:compileKotlin` OK.
+- GitHub Actions run `38814683875` (workflow_dispatch on the branch): unit tests + release APK **passed**.
+- On-device behavior: **not verified** — see R-127 for HANDS.
+
 ## Unreleased — R-124 Part 3
 
 ### Added

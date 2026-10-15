@@ -273,21 +273,7 @@ class RoomPadView(
         }
         if (t.canVolumeStep || t.canMute) {
             addView(g.spacer(context, h = 8))
-            addView(g.row(context).apply {
-                gravity = Gravity.CENTER
-                if (t.canVolumeStep) {
-                    addView(roundKey("VOL −") { send(MediaRemote.volumeDown(t.entityId)) })
-                    addView(g.spacer(context, w = 7))
-                }
-                if (t.canMute) {
-                    addView(roundKey(if (t.isMuted) "UNMUTE" else "MUTE", if (t.isMuted) Glass.RED else Glass.INK_DIM) {
-                        HaRepository.optimisticAttribute(listOf(t.entityId), "is_volume_muted", !t.isMuted)
-                        send(MediaRemote.mute(t.entityId, !t.isMuted))
-                    })
-                    if (t.canVolumeStep) addView(g.spacer(context, w = 7))
-                }
-                if (t.canVolumeStep) addView(roundKey("VOL +", Glass.MINT) { send(MediaRemote.volumeUp(t.entityId)) })
-            })
+            addView(mediaVolumeKeys(t.entityId, t.caps, t.isMuted))
         }
         if (t.showDpad) {
             addView(g.spacer(context, h = 10))
@@ -295,6 +281,25 @@ class RoomPadView(
             addView(g.spacer(context, h = 4)); addView(dpad(t))
         }
     }
+
+    /** VOL − · MUTE · VOL + from the shared [com.acewood.synapse.logic.MediaCaps] gate. */
+    private fun mediaVolumeKeys(entityId: String, caps: com.acewood.synapse.logic.MediaCaps, isMuted: Boolean): View =
+        g.row(context).apply {
+            gravity = Gravity.CENTER
+            if (caps.showVolumeKeys) {
+                addView(roundKey("VOL −") { caps.volumeDown(entityId)?.let { send(it) } })
+                addView(g.spacer(context, w = 7))
+            }
+            if (caps.showMute) {
+                val label = if (!caps.exactMute) "MUTE" else if (isMuted) "UNMUTE" else "MUTE"
+                addView(roundKey(label, if (caps.exactMute && isMuted) Glass.RED else Glass.INK_DIM) {
+                    if (caps.exactMute) HaRepository.optimisticAttribute(listOf(entityId), "is_volume_muted", !isMuted)
+                    caps.mute(entityId, !isMuted)?.let { send(it) }
+                })
+                if (caps.showVolumeKeys) addView(g.spacer(context, w = 7))
+            }
+            if (caps.showVolumeKeys) addView(roundKey("VOL +", Glass.MINT) { caps.volumeUp(entityId)?.let { send(it) } })
+        }
 
     // ---------- bigger Roku D-pad ----------
     private fun dpad(t: RoomControl.MediaTile): View = g.col(context).apply {

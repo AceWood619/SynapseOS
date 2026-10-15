@@ -96,8 +96,19 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         for (type in intArrayOf(Sensor.TYPE_LIGHT, Sensor.TYPE_PRESSURE, Sensor.TYPE_PROXIMITY, Sensor.TYPE_ACCELEROMETER)) {
             sm.getDefaultSensor(type)?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler) }
         }
+        HaRepository.attachStorage(filesDir)
+        registerNetworkWatch()
         handler.post { reloadConfig() }
         handler.postDelayed(loop, 3_000)
+    }
+
+    /** Wi-Fi back (router reboot, roam): reconnect to HA now instead of waiting out a 30 s backoff. */
+    private val netCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) { HaRepository.reconnectNow() }
+    }
+    private fun registerNetworkWatch() {
+        runCatching { getSystemService(android.net.ConnectivityManager::class.java).registerDefaultNetworkCallback(netCallback) }
+            .onFailure { Log.w(SynapseApp.TAG, "network watch unavailable: ${it.message}") }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -108,6 +119,7 @@ class NodeService : Service(), SensorEventListener, NodeActions {
         try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         NodeBus.removeEvent(busEvents)
         NodeBus.removeCommand(busCommands)
+        runCatching { getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(netCallback) }
         server?.stop()
         HaRepository.stop()
         ble?.stop()

@@ -52,7 +52,19 @@ class HomeView(
     private val onSwitchProfile: () -> Unit = {},
     private val onIntercom: () -> Unit = {},
     private val onWeather: () -> Unit = {},
+    /** Admin notices badge tapped (R-124 Part 4). */
+    private val onNotices: () -> Unit = {},
 ) : FrameLayout(context) {
+    /** Small amber count on the profile pill when there are unseen system notices (admins only). */
+    private val noticeBadge = TextView(context).apply {
+        textSize = 9.5f; setTextColor(Color.parseColor("#1a1000")); typeface = Glass.disp(context); gravity = Gravity.CENTER
+        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Glass.AMBER) }
+        visibility = View.GONE
+        tap { onNotices() }
+    }
+    private val heroOrb = NeuronOrbView(context)
+    /** Ambient covers the home screen without hiding it, so the host must pause the orb explicitly. */
+    fun setOrbRunning(running: Boolean) = heroOrb.setRunning(running)
     private val pillInitial = TextView(context)
     private val pillRole = TextView(context)
     private var profileName: String = cfg.ownerName.trim()
@@ -194,7 +206,20 @@ class HomeView(
         addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
         addView(jarvisChip)
         addView(haChip())
-        addView(profilePill())
+        addView(FrameLayout(context).apply {
+            clipChildren = false; clipToPadding = false
+            addView(profilePill())
+            val s = g.dp(context, 18f)
+            // Sits on the pill's top-right corner, inside the bounds (the status row clips overflow).
+            addView(noticeBadge, LayoutParams(s, s, Gravity.TOP or Gravity.END))
+        })
+    }
+
+    /** 0 hides the badge. Callers pass 0 for non-admin profiles. */
+    fun setNoticeCount(count: Int) {
+        if (count <= 0) { noticeBadge.visibility = View.GONE; return }
+        noticeBadge.text = if (count > 9) "9+" else count.toString()
+        noticeBadge.visibility = View.VISIBLE
     }
 
     /** Jarvis kill switch: the HA helpers that let Jarvis listen and act. */
@@ -236,10 +261,9 @@ class HomeView(
     private fun hero(): View = g.row(context).apply {
         background = g.panel(context, 20f)
         setPadding(g.dp(context, 16f), g.dp(context, 15f), g.dp(context, 16f), g.dp(context, 15f))
-        addView(TextView(context).apply {
-            text = "◉"; textSize = 26f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Glass.BLUE, Glass.INDIGO)).apply { shape = GradientDrawable.OVAL }
-            val s = g.dp(context, 56f); layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 14f) }
+        // R-124 Part 6: animated neuron orb (≈12 fps, paused off-screen/ambient, frame-time gated).
+        addView(heroOrb.apply {
+            val sz = g.dp(context, 60f); layoutParams = LinearLayout.LayoutParams(sz, sz).apply { rightMargin = g.dp(context, 12f) }
         })
         addView(g.col(context).apply { addView(greeting); addView(summary); addView(nowPlaying); addView(nowPlayingCard) },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -305,7 +329,7 @@ class HomeView(
         append(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)).append(HaRepository.connected).append(HaRepository.rooms.size)
         if (cache == null) return@buildString
         cache.byDomain("light").forEach { append(it.entityId).append(it.state) }
-        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]).append(it.attributes["entity_picture"]).append(it.attributes["volume_level"]) }
+        cache.byDomain("media_player").forEach { append(it.entityId).append(it.state).append(it.attributes["media_title"]).append(it.attributes["app_name"]).append(it.attributes["entity_picture"]).append(it.attributes["volume_level"]).append(it.attributes["is_volume_muted"]) }
         cache.byDomain("scene").forEach { append(it.entityId) }
         cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
         cache.byDomain("timer").forEach { append(it.entityId).append(it.state).append(it.attributes["remaining"]).append(it.attributes["duration"]) }
@@ -378,7 +402,24 @@ class HomeView(
                 })
             })
         }
-        HaRepository.rooms.firstOrNull { it.media.contains(p.entityId) }?.let { room ->
+        // Shared volume/mute gate: same caps (incl. Roku remote fallback) as the room pad.
+        val npRoom = HaRepository.rooms.firstOrNull { it.media.contains(p.entityId) }
+        val caps = cache?.let { com.acewood.synapse.logic.RoomControl.capsFor(p.entityId, HaRepository.rooms, it) } ?: p.caps
+        if (caps.showVolumeKeys || caps.showMute) {
+            nowPlayingCard.addView(g.row(context).apply {
+                gravity = Gravity.CENTER
+                if (caps.showVolumeKeys) addView(nowKey("VOL −") { caps.volumeDown(p.entityId)?.let { sendMedia(it) } })
+                if (caps.showMute) {
+                    val label = if (caps.exactMute && p.isMuted) "UNMUTE" else "MUTE"
+                    addView(nowKey(label, if (caps.exactMute && p.isMuted) Glass.RED else Glass.INK_DIM) {
+                        if (caps.exactMute) HaRepository.optimisticAttribute(listOf(p.entityId), "is_volume_muted", !p.isMuted)
+                        caps.mute(p.entityId, !p.isMuted)?.let { sendMedia(it) }
+                    })
+                }
+                if (caps.showVolumeKeys) addView(nowKey("VOL +", Glass.MINT) { caps.volumeUp(p.entityId)?.let { sendMedia(it) } })
+            })
+        }
+        npRoom?.let { room ->
             nowPlayingCard.addView(tv(11f, Glass.BLUE, g.disp(context)).apply {
                 text = "TV REMOTE  ·  ${room.name}"; gravity = Gravity.CENTER
                 setPadding(0, g.dp(context, 7f), 0, g.dp(context, 3f)); tap { onOpenRoom(room) }

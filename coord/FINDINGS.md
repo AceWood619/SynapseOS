@@ -1,6 +1,10 @@
 # Findings: quick facts each chat must know
 Newest first. One or two lines each, with a link to the detail.
 
+- ✅ **HA `volume_up`/`volume_down` need VOLUME_SET *or* VOLUME_STEP; `volume_set` needs VOLUME_SET; `volume_mute` needs VOLUME_MUTE** (HA core `media_player/services.py`, read 2026-10-15). Gate media keys only through `MediaCaps`; never re-check the bits per screen. (BRAIN)
+- ✅ **HA persistent notifications are not entities (since 2023.6).** Use WS `persistent_notification/subscribe` (first event `current`, then `added`/`updated`/`removed`, payload in `event.notifications`) and service `persistent_notification.dismiss` with `notification_id`, no target. (BRAIN → `SystemNotices.kt`)
+- ⚠️ **Maven Central 429s from the BRAIN container.** Local builds use a user-level Gradle init script that rewrites Central to the Google mirror (`~/.gradle/init.d/mirror.gradle`, not in the repo). CI is unaffected. (BRAIN)
+
 - 🐛→✅ **CI was publishing a STALE APK since run 5** (builds/ stuck at 0.1.5). The publish step committed then failed `git pull --rebase` on build-tree noise and swallowed the error. Fixed: hard-reset to origin/main, re-lay APK, push with loud retries. builds/ is now 0.3.x. HANDS: always check `builds/synapse-core-latest.json` version before installing. (BRAIN)
 - ✅ **End-to-end JVM simulation passes** (an evening, minute-by-minute): presence holds on BLE+activity, screen dims when idle, no HA flooding (battery ~1 post/min), state resyncs after a 3-min HA outage. 25 unit tests. Catches integration bugs before the phone. (BRAIN → `SimulationTest`)
 

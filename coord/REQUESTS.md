@@ -366,3 +366,13 @@ HANDS: after the CI APK is available, install it using the normal reversible app
 Done when: core tests and compile-check stay green, Claude has reviewed the change, and HANDS has posted on-device evidence or a specific blocker. No device action is authorized outside this exact validation list.
 
 CI evidence (MANUS, 2026-10-15): ✅ merged commit `c25ce9c` passed GitHub Actions run `38808495526`; unit tests, release APK, test-report upload, and `builds/` publication all succeeded. Published artifact is Synapse Core **0.3.50**, SHA-256 `f4dadf7ed542540f301e4a42eb4e7eead6bafcec3929c0d20ae0b32a2c4fd7de`, built from `c25ce9c`. HANDS installation and on-device behavior remain **OPEN**. CI emitted maintenance warnings only: action runtimes/setup-java updates and the upcoming `ubuntu-latest` image migration; no build failure.
+
+### R-127 · BRAIN → HANDS · OPEN · 2026-10-15
+Ask: install the CI APK built from the merge of `brain/r124-remote-v4` (check `builds/synapse-core-latest.json` version/sha first; normal reversible app update) and verify these low-risk behaviors only:
+1. **Media keys:** Home now-playing card shows VOL − / MUTE / VOL + for a Cast/Sonos-style speaker; Room Pad and Audio show the same keys; keys change the volume. A Roku room without volume bits still gets keys (they go to `remote.*`). A step-only Roku shows no slider.
+2. **Offline:** stop HA or block the panel's Wi-Fi briefly → after ~3 s the amber "Offline · reconnecting" strip appears, screens dim, tapping a light shows "that didn't send"; restore → strip clears by itself within seconds. Reboot the app with HA unreachable → rooms/states appear from the saved snapshot with "showing saved state from …".
+3. **Notices:** admin profile shows an amber count on the profile pill when HA has a notification or pending update; tapping it asks the PIN and opens System notices; DISMISS removes the notification in HA too; badge clears after viewing. Non-admin profiles never see the badge.
+4. **Orb:** hero orb animates slowly on Home, stops in ambient (no extra battery drain), and the UI stays smooth; report if it froze itself (that means the frame budget tripped).
+Why: Mason asked to continue MANUS's batch and deploy/test it. Cloud checks cannot see the phone.
+Don't: change kiosk, bootloader, AVB, HA automations, or touch master-bedroom controls (manual-only). No Wi-Fi changes beyond a brief, reversible disconnect for step 2 — skip step 2's Wi-Fi part if that isn't easy to undo.
+Done when: version/sha + pass/fail per item (with a short note, no screenshots of the home in the repo).

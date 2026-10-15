@@ -60,6 +60,7 @@ class MainActivity : Activity() {
     private var audioView: AudioView? = null
     private var diagnosticsView: DiagnosticsView? = null
     private var weatherView: WeatherView? = null
+    private var noticesView: NoticesView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -67,6 +68,7 @@ class MainActivity : Activity() {
     /** Coalesces HA updates: at most one UI refresh per 350 ms, however chatty the house is. */
     private var refreshQueued = false
     private val haListener: () -> Unit = {
+        ui.post { applyLinkUi() }
         if (!refreshQueued) {
             refreshQueued = true
             ui.postDelayed({
@@ -76,12 +78,18 @@ class MainActivity : Activity() {
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 diagnosticsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 weatherView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                noticesView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
+                updateNoticeBadge()
                 jarvisView?.let { if (it.visibility == View.VISIBLE) it.open() }
                 if (ambient.visibility == View.VISIBLE) ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             }, 350)
         }
     }
     private var haHomeChip: TextView? = null
+    /** R-124 Part 5: "Offline · reconnecting" strip over the dashboard (tap = retry now). */
+    private var linkStrip: TextView? = null
+    private var linkDimmed = false
+    private val blockedListener: () -> Unit = { ui.post { flashOffline() } }
     private var brightnessAnim: ValueAnimator? = null
     private var pageReady = false
     private lateinit var ambient: AmbientView
@@ -149,6 +157,7 @@ class MainActivity : Activity() {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
 
+        HaRepository.attachStorage(filesDir)
         root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         web = WebView(this)
         setupWebView()
@@ -180,6 +189,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         NodeBus.removeCommand(commands)
         HaRepository.removeListener(haListener)
+        HaRepository.removeBlocked(blockedListener)
         jarvisView?.close()
         ui.removeCallbacksAndMessages(null)
         web.destroy()
@@ -194,6 +204,8 @@ class MainActivity : Activity() {
         if (cfg?.kiosk != false) Kiosk.enterLockTask(this)
         idle.activity(now())
         applyMode()
+        HaRepository.reconnectNow()
+        applyLinkUi()
         launchCompanionsOnce()
     }
 
@@ -280,6 +292,7 @@ class MainActivity : Activity() {
                     .setDuration(2_000).setInterpolator(DecelerateInterpolator()).start()
                 applyAmbientBrightness()
             }
+            if (tickCount % 2 == 0L) applyLinkUi()   // grace expiry + honest "last update Nm ago" (no-op when unchanged)
             if (cfg == null && tickCount % 10 == 0L && ConfigStore.importIfPresent(this@MainActivity)) {
                 NodeBus.send(NodeBus.Command.CONFIG_CHANGED)
             }
@@ -290,6 +303,7 @@ class MainActivity : Activity() {
     private fun applyMode() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
         NodeBus.screenMode = if (amb) "ambient" else "active"
+        home?.setOrbRunning(!amb)
         if (amb) {
             if (HaRepository.hourlyForecast == null) HaRepository.requestForecast("hourly")
             ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
@@ -402,10 +416,12 @@ class MainActivity : Activity() {
                 onSwitchProfile = { switchProfile() },
                 onJarvisSwitch = { live -> jarvisKillSwitch(live) },
                 onIntercom = { showOverlay(intercomView) { it.open() } },
-                onWeather = { showOverlay(weatherView) { it.open() } }).also { h ->
+                onWeather = { showOverlay(weatherView) { it.open() } },
+                onNotices = { askPin { showOverlay(noticesView) { it.open() } } }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
+            HaRepository.onBlocked(blockedListener)
         }
         if (roomPad == null) {
             roomPad = RoomPadView(this, onBack = { showHome() }).also { p ->
@@ -444,6 +460,11 @@ class MainActivity : Activity() {
                 v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
+        if (noticesView == null) {
+            noticesView = NoticesView(this, onBack = { showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
         if (drawerView == null) {
             drawerView = AppDrawerView(this, onBack = { showHome() }, onLaunch = { app -> launchApp(app) },
                 activeProfile = { activeProfile }, onAllOff = { home?.allOffNow() }).also { v ->
@@ -465,6 +486,20 @@ class MainActivity : Activity() {
                 })
             }
         }
+        if (linkStrip == null) {
+            linkStrip = TextView(this).apply {
+                textSize = 12f; setTextColor(Glass.INK); typeface = Glass.disp(this@MainActivity)
+                letterSpacing = 0.04f; gravity = Gravity.CENTER; maxLines = 2
+                background = Glass.panel(this@MainActivity, 14f, Glass.withAlpha(Glass.AMBER, 70))
+                val padH = Glass.dp(this@MainActivity, 14f); val padV = Glass.dp(this@MainActivity, 8f)
+                setPadding(padH, padV, padH, padV)
+                visibility = View.GONE
+                tap { HaRepository.reconnectNow(); text = "Reconnecting to Home Assistant…" }
+                root.addView(this, FrameLayout.LayoutParams(-1, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP).apply {
+                    val m = Glass.dp(this@MainActivity, 10f); leftMargin = m; rightMargin = m; topMargin = m
+                })
+            }
+        }
         applyProfileToHome()
         home?.refresh()
         if (profiles != null && activeProfile == null) showProfileLock() else showHome()
@@ -473,6 +508,38 @@ class MainActivity : Activity() {
         haPathLoaded = null
         web.loadUrl(url)
         applyMode()
+    }
+
+    /** The HA-driven screens that grey out while offline (last known state stays readable). */
+    private fun linkScreens(): List<View?> = listOf(home, roomPad, sensorsView, intercomView, audioView, diagnosticsView, weatherView)
+
+    /** Show/hide the offline strip and grey the HA screens. Cheap: only touches views on a change. */
+    private fun applyLinkUi() {
+        val strip = linkStrip ?: return
+        val banner = if (cfg == null) null else synchronized(HaRepository) { HaRepository.link.banner(System.currentTimeMillis()) }
+        if (banner == null) {
+            if (strip.visibility != View.GONE) strip.visibility = View.GONE
+        } else {
+            if (strip.text != banner) strip.text = banner
+            if (strip.visibility != View.VISIBLE) strip.visibility = View.VISIBLE
+        }
+        val dim = banner != null
+        if (dim != linkDimmed) {
+            linkDimmed = dim
+            linkScreens().forEach { it?.animate()?.alpha(if (dim) 0.55f else 1f)?.setDuration(250)?.start() }
+        }
+    }
+
+    /** A control was pressed while offline: say so instead of silently doing nothing. */
+    private fun flashOffline() {
+        val strip = linkStrip ?: return
+        if (cfg == null) return
+        strip.text = "Offline · that didn't send · tap to retry"
+        strip.visibility = View.VISIBLE; strip.bringToFront(); ambient.bringToFront(); splash.bringToFront()
+        strip.animate().cancel()
+        strip.scaleX = 1.04f; strip.scaleY = 1.04f
+        strip.animate().scaleX(1f).scaleY(1f).setDuration(220).start()
+        ui.postDelayed({ applyLinkUi() }, 2_500)
     }
 
     /**
@@ -499,6 +566,17 @@ class MainActivity : Activity() {
     private fun applyProfileToHome() {
         val p = activeProfile ?: return
         home?.setProfile(p)
+        updateNoticeBadge()
+    }
+
+    /** R-124 Part 4: unseen HA notifications + pending updates, shown to admin profiles only. */
+    private fun updateNoticeBadge() {
+        val h = home ?: return
+        val admin = activeProfile?.role == com.acewood.synapse.logic.Role.ADMIN || profiles == null
+        if (!admin) { h.setNoticeCount(0); return }
+        val keys = com.acewood.synapse.logic.SystemNotices.keys(HaRepository.notices.list(),
+            com.acewood.synapse.logic.SystemNotices.updates(HaRepository.cache))
+        h.setNoticeCount(com.acewood.synapse.logic.SystemNotices.unseenCount(keys, NoticeSeenStore.seen(this)))
     }
 
     private fun showProfileLock() {
@@ -521,18 +599,20 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
-        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; drawerView?.visibility = View.GONE
+        jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; noticesView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }
         hideOverlays(); home?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
         haHomeChip?.visibility = View.GONE
+        linkStrip?.bringToFront(); applyLinkUi(); updateNoticeBadge()
         ambient.bringToFront(); splash.bringToFront() }
     /** Show one full-screen Synapse overlay (sensors, Jarvis, app drawer) over the home screen. */
     private fun <T : View> showOverlay(v: T?, prepare: (T) -> Unit = {}) {
         if (v == null) return
         hideOverlays(); home?.visibility = View.GONE; web.visibility = View.GONE; haHomeChip?.visibility = View.GONE
         v.visibility = View.VISIBLE; v.bringToFront(); prepare(v)
+        linkStrip?.bringToFront(); applyLinkUi()
         ambient.bringToFront(); splash.bringToFront()
     }
     /** Open a dock/drawer entry: a Synapse screen, a kiosk-allowed Android app, or (admin) a PIN-gated one. */
@@ -544,6 +624,7 @@ class MainActivity : Activity() {
                     "audio" -> showOverlay(audioView) { it.open() }
                     "sensors" -> showOverlay(sensorsView) { it.open() }
                     "diagnostics" -> showOverlay(diagnosticsView) { it.open() }
+                    "notices" -> showOverlay(noticesView) { it.open() }
                     "ha" -> showHa()
                     "music" -> showHa("/media-browser/browser")
                     "browser" -> startActivity(Intent(this, BrowserActivity::class.java))
