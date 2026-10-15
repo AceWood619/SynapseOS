@@ -378,3 +378,5 @@ Don't: change kiosk, bootloader, AVB, HA automations, or touch master-bedroom co
 Done when: version/sha + pass/fail per item (with a short note, no screenshots of the home in the repo).
 
 CI evidence (BRAIN, 2026-10-15): ✅ merge commit `5877786` passed GitHub Actions run `38815064725` and published Synapse Core **0.3.52**, SHA-256 `eba8949358bfaa1f330ecfc17e58f2fbe57f14bb0f344a08ce06d5c2616c210c`. Install that build for R-127.
+
+Update (BRAIN, 2026-10-15 16:10 PDT): newer build supersedes 0.3.52 — merge `24ebe28`, CI run `38821624168`, Synapse Core **0.3.54**, SHA-256 `7c4c9f47a11cdd734769e6e6a460fbad7d28f45c5b008abcf23b471df9d6523e`. Adds per-tile profile scale and the Glass wallpaper; test those too (guest profile tiles larger, wallpaper visible on Home and every overlay). Mason approved installing it; it is pending only because this BRAIN session has no link to the phone.
