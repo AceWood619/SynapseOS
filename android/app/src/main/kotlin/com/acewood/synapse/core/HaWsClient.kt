@@ -26,6 +26,8 @@ class HaWsClient(
     private val onChange: () -> Unit = {},
     /** Called once the HA area/entity/device registries have loaded, with the derived areas. */
     private val onAreas: (List<Area>) -> Unit = {},
+    /** Live-link changes (true = authenticated, false = dropped). Called from OkHttp threads. */
+    private val onConnection: (Boolean) -> Unit = {},
 ) {
     @Volatile var connected = false; private set
     @Volatile var lastError: String? = null; private set
@@ -39,6 +41,10 @@ class HaWsClient(
     @Volatile private var authed = false
     @Volatile private var closed = false
     @Volatile private var backoffMs = 1_000L
+    /** An open/auth attempt is in flight; guards [reconnectNow] against doubled sockets. */
+    @Volatile private var connecting = false
+    /** Bumped on every manual reconnect so stale backoff timers don't open a second socket. */
+    private val generation = AtomicLong(0)
 
     // Registry fetch bookkeeping: request id -> which list, plus the rows as they land.
     private var areaReqId = -1L
@@ -67,19 +73,48 @@ class HaWsClient(
     fun start() { closed = false; connect() }
     fun stop() { closed = true; try { ws?.close(1000, "bye") } catch (_: Exception) {}; ws = null }
 
+    /**
+     * Skip the backoff wait (network came back, user tapped RETRY, screen woke). No-op while
+     * connected, while an attempt is already in flight, or after an auth failure (needs new config).
+     */
+    fun reconnectNow() {
+        if (closed || connected || connecting) return
+        generation.incrementAndGet()
+        backoffMs = 1_000L
+        connect()
+    }
+
+    private val attempt = AtomicLong(0)
+
+    private fun dropped(myAttempt: Long) {
+        if (myAttempt != attempt.get()) return   // a superseded socket closing late must not mark the live one down
+        val was = connected
+        connected = false; authed = false; connecting = false
+        failPending()
+        if (was) onConnection(false)
+        scheduleReconnect()
+    }
+
+    /** Request/response callers (Jarvis, forecasts) must not wait forever on a dead socket. */
+    private fun failPending() {
+        val waiting = pending.keys.toList()
+        waiting.forEach { id -> pending.remove(id)?.let { cb -> runCatching { cb(HaWs.Frame.Result(id, false, null, "connection lost")) } } }
+    }
+
     private fun connect() {
         if (closed) return
-        authed = false
+        authed = false; connecting = true
+        val myAttempt = attempt.incrementAndGet()
         val req = Request.Builder().url(wsUrl()).build()
         ws = http.newWebSocket(req, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) = handle(text)
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) { /* TTS is not requested; STT events are text frames. */ }
             override fun onOpen(webSocket: WebSocket, response: Response) { Log.i(SynapseApp.TAG, "HA ws open") }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                connected = false; lastError = t.message; scheduleReconnect()
+                lastError = t.message; dropped(myAttempt)
             }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                connected = false; if (!closed) scheduleReconnect()
+                if (!closed) dropped(myAttempt)
             }
         })
     }
@@ -88,9 +123,10 @@ class HaWsClient(
         if (closed) return
         val delay = backoffMs
         backoffMs = (backoffMs * 2).coerceAtMost(30_000)
+        val gen = generation.get()
         Thread {
             try { Thread.sleep(delay) } catch (_: Exception) {}
-            if (!closed) connect()
+            if (!closed && gen == generation.get() && !connected && !connecting) connect()
         }.start()
     }
 
@@ -98,7 +134,8 @@ class HaWsClient(
         when (val f = HaWs.parse(text)) {
             is HaWs.Frame.AuthRequired -> ws?.send(HaWs.authMessage(cfg.haToken))
             is HaWs.Frame.AuthOk -> {
-                authed = true; connected = true; backoffMs = 1_000; lastError = null
+                authed = true; connected = true; connecting = false; backoffMs = 1_000; lastError = null
+                onConnection(true)
                 areaRows = null; entityRows = null; deviceRows = null
                 ws?.send(HaWs.subscribeStatesMessage(id.getAndIncrement()))
                 ws?.send(HaWs.getStatesMessage(id.getAndIncrement()))
@@ -106,7 +143,7 @@ class HaWsClient(
                 entityReqId = id.getAndIncrement(); ws?.send(HaWs.listEntitiesMessage(entityReqId))
                 deviceReqId = id.getAndIncrement(); ws?.send(HaWs.listDevicesMessage(deviceReqId))
             }
-            is HaWs.Frame.AuthInvalid -> { lastError = "auth invalid: ${f.message}"; closed = true; ws?.close(1000, "auth") }
+            is HaWs.Frame.AuthInvalid -> { lastError = "auth invalid: ${f.message}"; closed = true; connecting = false; ws?.close(1000, "auth") }
             is HaWs.Frame.Result -> {
                 when (f.id) {
                     areaReqId -> { areaRows = f.rows ?: emptyList(); maybeBuildAreas() }
