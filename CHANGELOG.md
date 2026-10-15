@@ -2,6 +2,23 @@
 
 All notable SynapseOS changes are recorded here. Device verification is separate from local build verification and is attributed to HANDS in `coord/REQUESTS.md`.
 
+## Unreleased — R-124 Part 6 polish + boot animation — BRAIN, 2026-10-15
+
+### Added
+
+- **Per-profile tile scale** applied per tile (rooms, scenes, dock), clamped 0.85–1.4, so the guest profile's 1.25 gives bigger thumb targets without cropping the 360 dp screen.
+- **Synapse Glass wallpaper** on every full-screen Synapse view: night radial ground + faint static neuron constellation, rendered once into a shared bitmap (one blit per draw).
+- **Boot animation**: `os/bootanim/make_bootanim.py` + committed `bootanimation.zip` (~2 MB, reproducible, self-verified format, seamless border). Install steps in `os/bootanim/README.md`.
+
+### Decided not to ship
+
+- **RenderEffect blur**: skipped. It can't be judged without the phone, and the orb plus wallpaper already give the depth. Revisit only with on-device frame data.
+
+### Verification
+
+- `:core-logic:test` 118/118, compile-check OK, branch CI run `38821322006` green.
+- Not on the phone yet: this session has no route to the LAN.
+
 ## Unreleased — Media gate fix + R-124 Parts 4, 5, 6 (orb) — BRAIN, 2026-10-15
 
 Picks up MANUS's last plan (MANUS out of credits). Branch `brain/r124-remote-v4`, merged to `main`.
