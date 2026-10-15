@@ -82,13 +82,16 @@ class HomeView(
         profileRoomIds = rooms.map { it.trim().lowercase().replace(' ', '_') }.filter { it.isNotEmpty() }.toSet()
         pillInitial.text = (profileName.firstOrNull() ?: 'S').uppercaseChar().toString()
         pillRole.text = role.uppercase()
-        // tileScale is kept in the profile but not applied yet: scaling the whole HomeView crops the
-        // edges on a 360 dp screen. It needs per-tile sizing (follow-up).
+        // Per-tile sizing (R-124 Part 6): rooms, scenes and dock grow; the console and header don't,
+        // so nothing crops on a 360 dp screen.
+        tiles = com.acewood.synapse.logic.TileScale(tileScale)
         buildDock()
         lastSig = null; refresh()
     }
 
     private val g = Glass
+    private var tiles = com.acewood.synapse.logic.TileScale.DEFAULT
+    private fun tdp(v: Float, max: Float = Float.MAX_VALUE) = g.dp(context, tiles.box(v, max).toFloat())
     private val greeting = tv(23f, Glass.INK, g.disp(context))
     private val summary = tv(12.5f, Glass.INK_DIM, g.light(context))
     private val nowPlaying = tv(12f, Glass.MINT, g.body(context)).apply { maxLines = 1; visibility = View.GONE }
@@ -526,13 +529,13 @@ class HomeView(
                 r.media.any { cache.get(it)?.state == "playing" })
             roomsRow.addView(g.col(context).apply {
                 background = g.tile(context, Glass.BLUE, r.id == activeRoomId || on, 16f)
-                setPadding(g.dp(context, 13f), g.dp(context, 11f), g.dp(context, 13f), g.dp(context, 11f))
-                layoutParams = LinearLayout.LayoutParams(g.dp(context, 108f), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                setPadding(tdp(13f), tdp(11f), tdp(13f), tdp(11f))
+                layoutParams = LinearLayout.LayoutParams(tdp(108f, 150f), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     rightMargin = g.dp(context, 9f)
                 }
-                addView(tv(11f, Glass.BLUE, g.disp(context)).apply { text = "CH ${i + 1}"; letterSpacing = 0.1f })
-                addView(tv(14f, Glass.INK, g.body(context)).apply { text = r.name; setTypeface(typeface, Typeface.BOLD); maxLines = 1 })
-                addView(tv(10.5f, Glass.INK_FAINT, g.body(context)).apply { text = roomSub(r, cache) })
+                addView(tv(tiles.text(11f), Glass.BLUE, g.disp(context)).apply { text = "CH ${i + 1}"; letterSpacing = 0.1f })
+                addView(tv(tiles.text(14f), Glass.INK, g.body(context)).apply { text = r.name; setTypeface(typeface, Typeface.BOLD); maxLines = 1 })
+                addView(tv(tiles.text(10.5f), Glass.INK_FAINT, g.body(context)).apply { text = roomSub(r, cache) })
                 tap { activeRoomId = r.id; onOpenRoom(r) }
             })
         }
@@ -560,10 +563,10 @@ class HomeView(
                 background = g.tile(context, accent, false, 15f)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(g.dp(context, 14f), g.dp(context, 10f), g.dp(context, 14f), g.dp(context, 10f))
-                layoutParams = LinearLayout.LayoutParams(0, g.dp(context, 56f), 1f).apply {
+                layoutParams = LinearLayout.LayoutParams(0, tdp(56f, 80f), 1f).apply {
                     if (i % 2 == 1) leftMargin = g.dp(context, 9f); topMargin = g.dp(context, 9f)
                 }
-                addView(tv(15f, Glass.INK, g.disp(context)).apply { text = prettyName(s.friendlyName); maxLines = 1 })
+                addView(tv(tiles.text(15f), Glass.INK, g.disp(context)).apply { text = prettyName(s.friendlyName); maxLines = 1 })
             }
             pad.tap { HaRepository.callService("scene", "turn_on", listOf(s.entityId)); flash(pad, accent) }
             rowView?.addView(pad)
@@ -616,7 +619,8 @@ class HomeView(
         var row: LinearLayout? = null
         apps.forEachIndexed { i, a ->
             if (i % 3 == 0) { row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }; dockWrap.addView(row) }
-            row?.addView(AppDrawerView.appCell(context, a, 54f) { onLaunch(a) },
+            val cap = com.acewood.synapse.logic.TileScale.maxCellDp(resources.configuration.screenWidthDp.toFloat().takeIf { it > 0 } ?: 360f, 3)
+            row?.addView(AppDrawerView.appCell(context, a, tiles.box(54f, cap - 20f)) { onLaunch(a) },
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { bottomMargin = g.dp(context, 14f) })
         }
         val rem = apps.size % 3
