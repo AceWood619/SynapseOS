@@ -115,6 +115,22 @@ class NodeConfigTest {
         assertTrue(r.contains("(set)"))
     }
 }
+class PanelSettingsTest {
+    @Test fun overnightNightDimUsesNightBrightness() {
+        val s = PanelSettings(nightDimEnabled = true, nightStart = "21:00", nightEnd = "06:00", nightBrightness = 0.01f)
+        assertEquals(0.01f, s.effectiveAmbientBrightness(22, 30))
+        assertEquals(0.01f, s.effectiveAmbientBrightness(5, 59))
+        assertEquals(0.02f, s.effectiveAmbientBrightness(12, 0))
+    }
+
+    @Test fun rejectsInvalidScheduleAndRanges() {
+        val errors = PanelSettings(idleSeconds = 2, nightStart = "25:00", nightEnd = "noon", nightBrightness = 2f).validate()
+        assertTrue(errors.any { it.contains("idle_seconds") })
+        assertTrue(errors.any { it.contains("night_start") })
+        assertTrue(errors.any { it.contains("night_end") })
+        assertTrue(errors.any { it.contains("night_brightness") })
+    }
+}
 
 class EntityTest {
     @Test fun ids() {

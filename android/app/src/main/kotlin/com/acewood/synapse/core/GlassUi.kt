@@ -82,7 +82,9 @@ fun View.tap(action: () -> Unit) {
     setOnTouchListener { v, ev ->
         when (ev.actionMasked) {
             android.view.MotionEvent.ACTION_DOWN -> {
-                try { v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}
+                if (PanelSettingsStore.load(v.context).hapticsEnabled) {
+                    try { v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) } catch (_: Exception) {}
+                }
                 v.animate().cancel(); v.animate().scaleX(0.94f).scaleY(0.94f).alpha(0.82f).setDuration(55).start()
             }
             android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL ->

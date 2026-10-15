@@ -52,6 +52,7 @@ class SettingsActivity : Activity() {
         }))
         outer.addView(g.spacer(this, h = 12))
         addAction(outer, "Manage profiles (admin PIN)") { openProfileAdmin() }
+        addAction(outer, "Panel settings (admin PIN)") { openPanelSettings() }
         outer.addView(g.spacer(this, h = 4))
         outer.addView(g.label(this, "MAINTENANCE"))
         outer.addView(g.spacer(this, h = 7))
@@ -116,6 +117,24 @@ class SettingsActivity : Activity() {
                 val admin = profiles.resolve(input.text.toString())?.role == Role.ADMIN
                 if (!admin) Toast.makeText(this, "Admin PIN required", Toast.LENGTH_SHORT).show()
                 else setContentView(ProfileAdminView(this, profiles) { recreate() })
+            }.show()
+    }
+
+    private fun openPanelSettings() {
+        val cfg = ConfigStore.load(this) ?: return
+        val profiles = ProfileStore.loadOrCreate(this, cfg)
+        if (profiles == null) { Toast.makeText(this, "Profiles are not configured", Toast.LENGTH_SHORT).show(); return }
+        val input = EditText(this).apply {
+            hint = "Admin PIN"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this).setTitle("Panel settings").setMessage("Enter an admin profile PIN to continue.").setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("UNLOCK") { _, _ ->
+                if (profiles.resolve(input.text.toString())?.role != Role.ADMIN) {
+                    Toast.makeText(this, "Admin PIN required", Toast.LENGTH_SHORT).show()
+                } else {
+                    setContentView(PanelSettingsView(this, PanelSettingsStore.load(this)) { recreate() })
+                }
             }.show()
     }
 

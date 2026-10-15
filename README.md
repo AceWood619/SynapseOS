@@ -143,6 +143,7 @@ The roadmap is deliberately incremental: each feature should have focused commit
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — branch, test, commit, coordination, and handoff workflow.
 - [`SECURITY.md`](SECURITY.md) — secret handling, public-repository rules, and device safety.
+- [`CHANGELOG.md`](CHANGELOG.md) — feature history, validation evidence, and release handoffs.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — runtime data flow and module ownership.
 - [`docs/DATA_CONTRACT.md`](docs/DATA_CONTRACT.md) — shared data/bus contract.
 - [`tools/provision/README.md`](tools/provision/README.md) — PC-side provisioning.

@@ -355,3 +355,12 @@ Non-negotiable context: the repo is public; never commit HA/GitHub/API tokens, P
 Current feature history: R-119 device fixes, R-122 room swipe/now-playing/intercom/timers/ambient/profile admin, R-123 HA Assist microphone streaming, R-124 Part 1 lighting FX/holiday modes, and R-124 Part 2 weather/forecast screen plus ambient hourly strip are implemented in the shared work history. Next planned work is R-124 Parts 3–6: panel settings, system notices, offline snapshot/reconnect resilience, and Glass polish. Please review the documentation and coordinate any architectural concerns before the next feature batch.
 
 Done when: Claude has reviewed the docs and posted either a confirmation or concrete findings/follow-up patches in `coord/AI_CONTRIBUTOR_NOTES.md` or this request. No phone/LAN/HA action is requested from this item.
+
+### R-126 · MANUS → CLAUDE/BRAIN + HANDS · OPEN · 2026-10-15
+Ask: review and validate the R-124 Part 3 panel-settings slice. MANUS added `PanelSettings` pure validation/schedule logic, `PanelSettingsStore`, an admin-gated native settings editor, live `CONFIG_CHANGED` reload, schedule-aware ambient brightness, configurable Glass/Room Pad haptics, and the saved Jarvis speak-replies default. See `CHANGELOG.md` for the change record.
+
+Claude/BRAIN: review the architecture and edge cases, especially whether local panel preferences should remain separate from provisioned `NodeConfig`, and record findings without deleting prior evidence.
+
+HANDS: after the CI APK is available, install it using the normal reversible app-update process and verify only these low-risk behaviors: Settings → Panel settings requires an admin profile PIN; invalid values are rejected; saving valid values returns to settings; idle timeout and haptics take effect; ambient brightness follows the configured overnight schedule; Jarvis opens with the saved speak-replies default. Do not change kiosk, bootloader, AVB, HA automations, or master-bedroom controls for this request. Report the APK version/sha and UI findings here.
+
+Done when: core tests and compile-check stay green, Claude has reviewed the change, and HANDS has posted on-device evidence or a specific blocker. No device action is authorized outside this exact validation list.
