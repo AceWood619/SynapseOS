@@ -23,8 +23,8 @@ _Last updated: 2026-10-07 17:10 UTC (BRAIN)._
 - **⏸️ BRAIN holding** for Mason's on-device reaction before the next stack: PIN/profile lock screen (multi-user), app drawer (Camera/Settings/Jarvis/browser/music), Glass wallpaper.
 - **Need from Mason:** reaction to the full batch; **master-bedroom light mapping** (several cloud+local bulbs can't be auto-paired safely — which local pairs with which cloud?); logo approval.
 
-## MANUS (app features; working from its own sandbox)
-_Last updated: 2026-10-07 14:35 PDT (MANUS; posted by HANDS because MANUS's GitHub push gets 403)_
+## MANUS (app features, documentation, and repository organization)
+_Last updated: 2026-10-15 14:07 PDT (MANUS)_
 - **Done:** R-119 fixes (landed via HANDS as bf2c8b2). Profiles + PIN first slice: `ProfileStore` (hashed profiles only), Glass `ProfileLockView`, startup gating in `MainActivity` (applied by HANDS from MANUS's patch ec342b7).
 - **Done locally:** profile-aware app drawer/dock filtering from `layout.home_apps`, room-channel filtering from `layout.rooms`, and per-profile tile scale from `layout.tile_scale`; admin remains unrestricted. Tests and compile check pass.
 - **Done locally:** customized Glass `SettingsActivity` with node/profile status and kiosk maintenance controls; added native in-kiosk `BrowserActivity` (HA home, address/search, back/forward/reload); added native `CameraActivity` (preview, capture, MediaStore save under Pictures/Synapse). App catalog now routes Browser, Camera, and Settings to Synapse surfaces. Tests and compile check pass.
@@ -40,6 +40,8 @@ _Last updated: 2026-10-07 14:35 PDT (MANUS; posted by HANDS because MANUS's GitH
 - **Navigation v2 done locally:** The bottom console now has functional HOME, ROOMS, MIC, AUDIO, and MORE destinations. Rooms scrolls directly to room channels, Audio opens the dedicated speaker/media screen, More opens the app drawer, and the existing ALL OFF safety action is preserved inside More. Core tests and compile check pass.
 - **Room diagnostics done locally:** Added an admin-PIN-gated Glass diagnostics screen to More. It classifies HA entities into visible room controls, folded helpers, unmapped entities, unavailable entities, and sensors, showing both friendly names and exact entity IDs. It refreshes live with HA state so missing Ivy controls can be identified on-device. Core tests and compile check pass.
 - **R-124 Part 1 done locally:** Added HA-driven Lighting FX controls for available `ace_fx_*`, `ivy_apply`, and Holiday scripts; missing scripts are omitted and calls are guarded by live entity presence. Added Holiday `input_select` option picker plus apply script, and dynamic Jarvis FX quick actions. Existing Game mode behavior remains intact. Core tests and compile check pass.
-- **Next:** package Part 4 for HANDS; all R-122 parts are now implemented locally.
-- **Blocked on:** GitHub write access (403 even with a fine-grained token). Until it's fixed, MANUS shares `git format-patch` files and HANDS applies them.
+- **R-124 Part 2 done locally:** Added HA `weather.get_forecasts` return-response framing, normalized hourly/daily forecast parsing, a full Glass weather screen, weather-chip navigation, and an ambient hourly strip. `:core-logic:test` and `compile-check :appmod:compileKotlin` both pass. Commit `157a211`; patch was previously delivered while GitHub write access was unavailable.
+- **Repository organization in progress:** replacing the stale README with a detailed architecture/status guide and adding `CONTRIBUTING.md`, `SECURITY.md`, and `docs/ARCHITECTURE.md`. R-125 asks Claude/BRAIN to review those docs and record findings without erasing prior evidence.
+- **Next:** implement R-124 Parts 3–6 in focused commits: panel settings, system notices, offline snapshots/reconnect resilience, and Glass polish. HANDS still needs to install/review the weather build on the phone.
+- **GitHub:** authenticated write access is now available in this session; the project remains coordinated around `main`, while GitHub currently reports a historical `claude/research-report` default branch that needs review before changing repository settings.
 - **Safety:** no PINs, tokens, screenshots or device data committed.
