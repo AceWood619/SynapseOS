@@ -52,6 +52,9 @@ class MainActivity : Activity() {
     private lateinit var root: FrameLayout
     private var webCrashes = 0
     private lateinit var splash: LinearLayout
+    /** Redesign option B: the Remote is the home screen. */
+    private var remoteHome: RemoteHomeView? = null
+    /** The former home, now the "House" screen (modes, FX, timers, scenes, rooms, apps). */
     private var home: HomeView? = null
     private var roomPad: RoomPadView? = null
     private var sensorsView: SensorsView? = null
@@ -73,6 +76,7 @@ class MainActivity : Activity() {
             refreshQueued = true
             ui.postDelayed({
                 refreshQueued = false
+                remoteHome?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 home?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 roomPad?.let { if (it.visibility == View.VISIBLE) it.refresh() }
                 sensorsView?.let { if (it.visibility == View.VISIBLE) it.refresh() }
@@ -120,7 +124,7 @@ class MainActivity : Activity() {
         addView(TextView(context).apply {
             text = "SYNAPSE"
             textSize = 34f; setTextColor(Color.rgb(120, 170, 255))
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            typeface = Glass.light(this@MainActivity)
             letterSpacing = 0.34f; gravity = Gravity.CENTER
         })
         addView(TextView(context).apply {
@@ -287,9 +291,7 @@ class MainActivity : Activity() {
             // Burn-in protection: nudge the clock a little every minute.
             if (ambient.visibility == View.VISIBLE && tickCount % 5 == 0L) hideSystemBars()
             if (tickCount % 60 == 0L && ambient.visibility == View.VISIBLE) {
-                ambient.animate().translationX(Random.nextInt(-dp(30), dp(30)).toFloat())
-                    .translationY(Random.nextInt(-dp(40), dp(40)).toFloat())
-                    .setDuration(2_000).setInterpolator(DecelerateInterpolator()).start()
+                ambient.nudge()   // shifts content inside the black root; the root never moves
                 applyAmbientBrightness()
             }
             if (tickCount % 2 == 0L) applyLinkUi()   // grace expiry + honest "last update Nm ago" (no-op when unchanged)
@@ -303,7 +305,7 @@ class MainActivity : Activity() {
     private fun applyMode() {
         val amb = idle.mode == IdleController.Mode.AMBIENT && cfg != null
         NodeBus.screenMode = if (amb) "ambient" else "active"
-        home?.setOrbRunning(!amb)
+        home?.setOrbRunning(!amb && home?.visibility == View.VISIBLE)
         if (amb) {
             if (HaRepository.hourlyForecast == null) HaRepository.requestForecast("hourly")
             ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
@@ -402,12 +404,25 @@ class MainActivity : Activity() {
         }
         idle.idleMs = PanelSettingsStore.load(this).idleSeconds * 1000L
         // Native Glass home (default). HA Lovelace stays loaded underneath as the "HA" tab.
+        if (remoteHome == null) {
+            remoteHome = RemoteHomeView(this, c,
+                onOpenRoom = { room -> showRoomPad(room) },
+                onMic = { openAssist() },
+                onHouse = { showHouse() },
+                onMore = { showOverlay(drawerView) { it.open() } },
+                onSwitchProfile = { switchProfile() },
+                onJarvisSwitch = { live -> jarvisKillSwitch(live) },
+                onWeather = { showOverlay(weatherView) { it.open() } },
+                onNotices = { askPin { showOverlay(noticesView) { it.open() } } }).also { h ->
+                root.addView(h, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
         if (home == null) {
             home = HomeView(this, c,
                 onOpenRoom = { room -> showRoomPad(room) },
                 onMic = { openAssist() },
-                onHome = { showHome(); home?.scrollToTop() },
-                onRooms = { showHome(); home?.scrollToRooms() },
+                onHome = { showHome() },
+                onRooms = { home?.scrollToRooms() },
                 onAudio = { showOverlay(audioView) { it.open() } },
                 onHa = { showHa() },
                 onApps = { showOverlay(drawerView) { it.open() } },
@@ -418,6 +433,7 @@ class MainActivity : Activity() {
                 onIntercom = { showOverlay(intercomView) { it.open() } },
                 onWeather = { showOverlay(weatherView) { it.open() } },
                 onNotices = { askPin { showOverlay(noticesView) { it.open() } } }).also { h ->
+                h.visibility = View.GONE
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
             }
             HaRepository.onChange(haListener)
@@ -501,7 +517,7 @@ class MainActivity : Activity() {
             }
         }
         applyProfileToHome()
-        home?.refresh()
+        remoteHome?.refresh()
         if (profiles != null && activeProfile == null) showProfileLock() else showHome()
         hideSplash()
         val url = c.dashboardUrl + (if (c.dashboardUrl.contains('?')) "&" else "?") + "external_auth=1"
@@ -511,7 +527,7 @@ class MainActivity : Activity() {
     }
 
     /** The HA-driven screens that grey out while offline (last known state stays readable). */
-    private fun linkScreens(): List<View?> = listOf(home, roomPad, sensorsView, intercomView, audioView, diagnosticsView, weatherView)
+    private fun linkScreens(): List<View?> = listOf(remoteHome, home, roomPad, sensorsView, intercomView, audioView, diagnosticsView, weatherView)
 
     /** Show/hide the offline strip and grey the HA screens. Cheap: only touches views on a change. */
     private fun applyLinkUi() {
@@ -566,17 +582,17 @@ class MainActivity : Activity() {
     private fun applyProfileToHome() {
         val p = activeProfile ?: return
         home?.setProfile(p)
+        remoteHome?.setProfile(p)
         updateNoticeBadge()
     }
 
     /** R-124 Part 4: unseen HA notifications + pending updates, shown to admin profiles only. */
     private fun updateNoticeBadge() {
-        val h = home ?: return
         val admin = activeProfile?.role == com.acewood.synapse.logic.Role.ADMIN || profiles == null
-        if (!admin) { h.setNoticeCount(0); return }
-        val keys = com.acewood.synapse.logic.SystemNotices.keys(HaRepository.notices.list(),
-            com.acewood.synapse.logic.SystemNotices.updates(HaRepository.cache))
-        h.setNoticeCount(com.acewood.synapse.logic.SystemNotices.unseenCount(keys, NoticeSeenStore.seen(this)))
+        val count = if (!admin) 0 else com.acewood.synapse.logic.SystemNotices.unseenCount(
+            com.acewood.synapse.logic.SystemNotices.keys(HaRepository.notices.list(), com.acewood.synapse.logic.SystemNotices.updates(HaRepository.cache)),
+            NoticeSeenStore.seen(this))
+        home?.setNoticeCount(count); remoteHome?.setNoticeCount(count)
     }
 
     private fun showProfileLock() {
@@ -592,26 +608,28 @@ class MainActivity : Activity() {
         }
         hideOverlays()
         web.visibility = View.GONE
-        home?.visibility = View.GONE
+        home?.visibility = View.GONE; remoteHome?.visibility = View.GONE
         profileLock?.visibility = View.VISIBLE
         profileLock?.bringToFront()
     }
 
     private fun hideOverlays() {
-        roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE
+        roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE; home?.visibility = View.GONE
         jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; noticesView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
         if (profiles != null && activeProfile == null) { showProfileLock(); return }
-        hideOverlays(); home?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
+        hideOverlays(); remoteHome?.let { it.visibility = View.VISIBLE; it.bringToFront(); it.refresh() }; web.visibility = View.GONE
+        home?.setOrbRunning(false)
         haHomeChip?.visibility = View.GONE
         linkStrip?.bringToFront(); applyLinkUi(); updateNoticeBadge()
         ambient.bringToFront(); splash.bringToFront() }
     /** Show one full-screen Synapse overlay (sensors, Jarvis, app drawer) over the home screen. */
     private fun <T : View> showOverlay(v: T?, prepare: (T) -> Unit = {}) {
         if (v == null) return
-        hideOverlays(); home?.visibility = View.GONE; web.visibility = View.GONE; haHomeChip?.visibility = View.GONE
+        hideOverlays(); remoteHome?.visibility = View.GONE; web.visibility = View.GONE; haHomeChip?.visibility = View.GONE
         v.visibility = View.VISIBLE; v.bringToFront(); prepare(v)
+        home?.setOrbRunning(v === home)
         linkStrip?.bringToFront(); applyLinkUi()
         ambient.bringToFront(); splash.bringToFront()
     }
@@ -644,6 +662,8 @@ class MainActivity : Activity() {
         val rooms = if (allowed.isEmpty()) HaRepository.rooms else HaRepository.rooms.filter { it.id.lowercase() in allowed }
         it.open(room, rooms)
     }
+    /** The House screen (the former home): modes, Light FX, timers, scenes, rooms and apps. */
+    private fun showHouse() = showOverlay(home) { it.refresh(); it.scrollToTop() }
     private var haPathLoaded: String? = null
     private fun showHa(path: String? = null) {
         val c = cfg
@@ -652,7 +672,7 @@ class MainActivity : Activity() {
             val base = if (path == null) c.dashboardUrl else c.haUrl.trimEnd('/') + path
             web.loadUrl(base + (if (base.contains('?')) "&" else "?") + "external_auth=1")
         }
-        hideOverlays(); web.visibility = View.VISIBLE; web.bringToFront(); home?.visibility = View.GONE
+        hideOverlays(); web.visibility = View.VISIBLE; web.bringToFront(); remoteHome?.visibility = View.GONE
         haHomeChip?.let { it.visibility = View.VISIBLE; it.bringToFront() }
         ambient.bringToFront(); splash.bringToFront() }
     private fun openAssist() {

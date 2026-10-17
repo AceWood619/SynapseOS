@@ -19,9 +19,16 @@ object Glass {
     val STROKE = Color.argb(56, 130, 170, 255)
     val STROKE_BRIGHT = Color.argb(140, 130, 190, 255)
 
-    fun disp(ctx: Context): Typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-    fun body(ctx: Context): Typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-    fun light(ctx: Context): Typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    // Redesign 2026-10-16: Sora (display) + Manrope (body), SIL OFL, bundled as static subsets in
+    // assets/fonts (licenses beside them). Loaded once; falls back to the system face if missing.
+    private val faces = HashMap<String, Typeface>()
+    private fun face(ctx: Context, file: String, fallback: Typeface): Typeface = synchronized(faces) {
+        faces.getOrPut(file) { runCatching { Typeface.createFromAsset(ctx.applicationContext.assets, "fonts/$file") }.getOrDefault(fallback) }
+    }
+    fun disp(ctx: Context): Typeface = face(ctx, "sora-semibold.ttf", Typeface.create("sans-serif-condensed", Typeface.BOLD))
+    fun body(ctx: Context): Typeface = face(ctx, "manrope-medium.ttf", Typeface.create("sans-serif", Typeface.NORMAL))
+    fun bodyBold(ctx: Context): Typeface = face(ctx, "manrope-bold.ttf", Typeface.create("sans-serif", Typeface.BOLD))
+    fun light(ctx: Context): Typeface = face(ctx, "sora-light.ttf", Typeface.create("sans-serif-light", Typeface.NORMAL))
 
     fun dp(ctx: Context, v: Float): Int = (v * ctx.resources.displayMetrics.density).toInt()
 

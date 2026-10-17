@@ -47,7 +47,7 @@ class ProfileLockView(
             textSize = 28f
             letterSpacing = 0.24f
             gravity = Gravity.CENTER
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            typeface = Glass.light(context)
             setTextColor(Glass.BLUE)
         })
         outer.addView(TextView(context).apply {
