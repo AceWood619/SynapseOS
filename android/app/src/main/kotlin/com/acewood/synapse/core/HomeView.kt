@@ -198,24 +198,22 @@ class HomeView(
         })
     }
 
+    /**
+     * Redesign: this screen is now "House" (reached from the Remote home). Its strip is a simple title bar;
+     * Jarvis, profile and notices live on the Remote header, so nothing here can crowd or clip.
+     */
     private fun statusStrip(): View = g.row(context).apply {
-        addView(View(context).apply {
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Glass.MINT) }
-            layoutParams = LinearLayout.LayoutParams(g.dp(context, 7f), g.dp(context, 7f)).apply { rightMargin = g.dp(context, 8f) }
+        addView(tv(12f, Glass.INK_DIM, g.bodyBold(context)).apply {
+            text = "‹  REMOTE"; letterSpacing = 0.08f; gravity = Gravity.CENTER
+            background = g.tile(context, Glass.INK_DIM, false, 14f)
+            setPadding(g.dp(context, 14f), g.dp(context, 10f), g.dp(context, 14f), g.dp(context, 10f))
+            tap { onHome() }
         })
-        addView(tv(12f, Glass.INK_DIM, g.disp(context)).apply { text = "SYNAPSE"; letterSpacing = 0.15f })
-        addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
+        addView(tv(20f, Glass.INK, g.disp(context)).apply {
+            text = "House"; maxLines = 1; setPadding(g.dp(context, 14f), 0, 0, 0)
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(weatherChip.apply { setPadding(0, 0, g.dp(context, 10f), 0); tap { onWeather() } })
-        addView(TextClock(context).apply { format12Hour = "h:mm a"; format24Hour = "H:mm"; setTextColor(Glass.INK_DIM); textSize = 12f })
-        addView(jarvisChip)
         addView(haChip())
-        addView(FrameLayout(context).apply {
-            clipChildren = false; clipToPadding = false
-            addView(profilePill())
-            val s = g.dp(context, 18f)
-            // Sits on the pill's top-right corner, inside the bounds (the status row clips overflow).
-            addView(noticeBadge, LayoutParams(s, s, Gravity.TOP or Gravity.END))
-        })
     }
 
     /** 0 hides the badge. Callers pass 0 for non-admin profiles. */
