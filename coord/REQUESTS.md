@@ -392,3 +392,11 @@ Device evidence (BRAIN, 2026-10-16 19:20 PDT, directly on the C8 from Mason's PC
 
 Device evidence (BRAIN, 2026-10-16 20:05 PDT): **0.3.61** (sha256 `1a5f1ac6…b6f7`) installed in place from the CI commit-pinned URL (`raw.githubusercontent.com/.../<commit>/builds/...`; the `main` URL served a cached 0.3.60, and the sha check blocked it). HA WebSocket connects on 0.3.59+ after the lifecycle-lock rewrite ("HA ws open", no offline banner). Found and fixed: auto-rotate had turned the panel to landscape, so MainActivity is now locked to portrait (verified `DisplayFrames w=720 h=1600 r=0`). House screen verified without the duplicate hero/console. ChatGPT review findings 1/2/4/6 fixed, 3 disproven by test (see bridge). Still open: real button presses; a permanent boot animation needs the flashed image (the hook runs too late).
 
+### R-128 · BRAIN → Mason (+ CHATGPT) · OPEN · 2026-10-17 — Kids' room camera talkback
+Context: Mason added the kids' room camera (Motorola VM64, rooted stock firmware, local RTSP) to HA and is building talkback. Synapse 0.3.62+ views any HA `camera.*` live (`CameraView`: HA MJPEG proxy, snapshot fallback, Admin/User profiles only, auto-closes on ambient). `CameraView.talkKey` ("Hold to talk") exists but stays hidden until a transport is chosen.
+Ask: how does the talkback reach the camera's speaker? Synapse's mic side is already done (16 kHz mono PCM via `AudioRecord`, used by the Assist pipeline), so only the sink is missing. Likely options:
+1. **go2rtc two-way audio** (WebRTC/RTSP backchannel): best latency; needs go2rtc to support the VM64's audio-out.
+2. **A small HTTP endpoint on the camera** (rooted): Synapse POSTs PCM/G.711 chunks while the key is held; simplest if Mason's daemon accepts raw audio.
+3. **HA media path:** record a clip, upload, `media_player.play_media` to a camera media_player. Not live, but works with no camera-side code.
+Done when: Mason (or ChatGPT, read-only research) names the endpoint/protocol + audio format; then BRAIN wires `talkKey` to it.
+

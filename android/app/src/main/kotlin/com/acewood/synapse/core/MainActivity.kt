@@ -64,6 +64,7 @@ class MainActivity : Activity() {
     private var diagnosticsView: DiagnosticsView? = null
     private var weatherView: WeatherView? = null
     private var noticesView: NoticesView? = null
+    private var cameraView: CameraView? = null
     private var drawerView: AppDrawerView? = null
     private var profileLock: ProfileLockView? = null
     private var profiles: Profiles? = null
@@ -310,6 +311,7 @@ class MainActivity : Activity() {
         NodeBus.screenMode = if (amb) "ambient" else "active"
         home?.setOrbRunning(!amb && home?.visibility == View.VISIBLE)
         if (amb) {
+            if (cameraView?.visibility == View.VISIBLE) showHome()   // never leave a camera streaming behind the clock
             if (HaRepository.hourlyForecast == null) HaRepository.requestForecast("hourly")
             ambient.refresh(HaRepository.cache, cfg, activeProfile, HaRepository.hourlyForecast)
             ambient.visibility = View.VISIBLE
@@ -420,8 +422,15 @@ class MainActivity : Activity() {
                 onSwitchProfile = { switchProfile() },
                 onJarvisSwitch = { live -> jarvisKillSwitch(live) },
                 onWeather = { showOverlay(weatherView) { it.open() } },
-                onNotices = { askPin { showOverlay(noticesView) { it.open() } } }).also { h ->
+                onNotices = { askPin { showOverlay(noticesView) { it.open() } } },
+                onCamera = { id, label -> showCamera(id, label) },
+                cameraAllowed = { com.acewood.synapse.logic.CameraFeed.allowed(activeProfile) }).also { h ->
                 root.addView(h, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (cameraView == null) {
+            cameraView = CameraView(this, onBack = { cameraView?.close(); showHome() }).also { v ->
+                v.visibility = View.GONE; root.addView(v, FrameLayout.LayoutParams(-1, -1))
             }
         }
         if (home == null) {
@@ -447,7 +456,9 @@ class MainActivity : Activity() {
             HaRepository.onBlocked(blockedListener)
         }
         if (roomPad == null) {
-            roomPad = RoomPadView(this, onBack = { showHome() }).also { p ->
+            roomPad = RoomPadView(this, onBack = { showHome() },
+                onCamera = { id, label -> showCamera(id, label) },
+                cameraAllowed = { com.acewood.synapse.logic.CameraFeed.allowed(activeProfile) }).also { p ->
                 p.visibility = View.GONE
                 root.addView(p, FrameLayout.LayoutParams(-1, -1))
             }
@@ -623,6 +634,7 @@ class MainActivity : Activity() {
 
     private fun hideOverlays() {
         roomPad?.visibility = View.GONE; sensorsView?.visibility = View.GONE; home?.visibility = View.GONE
+        cameraView?.let { if (it.visibility == View.VISIBLE) { it.close(); it.visibility = View.GONE } }
         jarvisView?.visibility = View.GONE; intercomView?.visibility = View.GONE; audioView?.visibility = View.GONE; diagnosticsView?.visibility = View.GONE; weatherView?.visibility = View.GONE; noticesView?.visibility = View.GONE; drawerView?.visibility = View.GONE
     }
     private fun showHome() {
@@ -673,6 +685,14 @@ class MainActivity : Activity() {
         val rooms = if (allowed.isEmpty()) HaRepository.rooms else HaRepository.rooms.filter { it.id.lowercase() in allowed }
         it.open(room, rooms)
     }
+    /** Live camera, gated by profile level (Child/Guest can't view cameras). */
+    private fun showCamera(entityId: String, label: String) {
+        if (!com.acewood.synapse.logic.CameraFeed.allowed(activeProfile)) {
+            Toast.makeText(this, "Cameras need an adult profile", Toast.LENGTH_SHORT).show(); return
+        }
+        showOverlay(cameraView) { it.open(entityId, label) }
+    }
+
     /** The House screen (the former home): modes, Light FX, timers, scenes, rooms and apps. */
     private fun showHouse() = showOverlay(home) { it.refresh(); it.scrollToTop() }
     private var haPathLoaded: String? = null

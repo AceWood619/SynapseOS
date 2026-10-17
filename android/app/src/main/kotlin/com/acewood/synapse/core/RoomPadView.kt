@@ -32,6 +32,8 @@ import kotlin.math.roundToInt
 class RoomPadView(
     context: Context,
     private val onBack: () -> Unit,
+    private val onCamera: (String, String) -> Unit = { _, _ -> },
+    private val cameraAllowed: () -> Boolean = { true },
 ) : FrameLayout(context) {
 
     private val g = Glass
@@ -148,6 +150,7 @@ class RoomPadView(
                 if (m.lightsAmbiguous) append("  ·  MAP LIGHTS")
             }
             bodyCol.removeAllViews()
+            if (r.cameras.isNotEmpty() && cameraAllowed()) section("CAMERA", r.cameras.map { cameraCard(it, r.name) })
             section("LIGHTS", m.lights.map { lightCard(it) })
             m.media.forEach { addCard(mediaStrip(it)) }
             section("CLIMATE", m.climate.map { climateCard(it) })
@@ -174,6 +177,20 @@ class RoomPadView(
         cards.forEach { addCard(it) }
     }
     private fun addCard(v: View) { bodyCol.addView(v); bodyCol.addView(g.spacer(context, h = 9)) }
+
+    // ---------- CAMERA ----------
+    private fun cameraCard(entityId: String, roomName: String): View = g.row(context).apply {
+        val label = com.acewood.synapse.logic.CameraFeed.label(entityId, roomName, null)
+        background = GradientDrawable().apply { cornerRadius = g.dp(context, 20f).toFloat(); setColor(Color.argb(10, 255, 255, 255)); setStroke(g.dp(context, 1f), Glass.withAlpha(Glass.RED, 110)) }
+        setPadding(g.dp(context, 16f), g.dp(context, 14f), g.dp(context, 16f), g.dp(context, 14f))
+        addView(GlassIcon(context, GlassIcon.Kind.CAMERA, Glass.RED, 2f), LinearLayout.LayoutParams(g.dp(context, 26f), g.dp(context, 26f)).apply { rightMargin = g.dp(context, 12f) })
+        addView(g.col(context).apply {
+            addView(tv(16f, Glass.INK, g.bodyBold(context)).apply { text = label })
+            addView(tv(13f, Glass.INK_FAINT, g.body(context)).apply { text = HaRepository.cache?.get(entityId)?.state?.let { if (it == "unavailable") "Unavailable" else "Tap to watch live" } ?: "Tap to watch live" })
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(tv(13f, Glass.RED, g.bodyBold(context)).apply { text = "WATCH" })
+        tap { onCamera(entityId, label) }
+    }
 
     // ---------- LIGHT ----------
     private fun lightCard(t: RoomControl.LightTile): View = g.col(context).apply {

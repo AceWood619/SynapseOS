@@ -12,7 +12,7 @@ import android.view.View
  * on emoji/symbol glyphs that render differently on each Android build. Cheap: one path per draw.
  */
 class GlassIcon(context: Context, private var kind: Kind, color: Int, private val strokeUnits: Float = 2.2f) : View(context) {
-    enum class Kind { CHEVRON_LEFT, CHEVRON_RIGHT, CHEVRON_UP, CHEVRON_DOWN, MUTE, PLAY, PAUSE, BACK, BULB, TV, GRID, MIC, POWER, PLUS, MINUS, HOUSE, DOTS, PREV, NEXT }
+    enum class Kind { CHEVRON_LEFT, CHEVRON_RIGHT, CHEVRON_UP, CHEVRON_DOWN, MUTE, PLAY, PAUSE, BACK, BULB, TV, GRID, MIC, POWER, PLUS, MINUS, HOUSE, DOTS, PREV, NEXT, CAMERA }
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; this.color = color
@@ -53,6 +53,9 @@ class GlassIcon(context: Context, private var kind: Kind, color: Int, private va
             Kind.HOUSE -> { path.moveTo(3f, 11f); path.lineTo(12f, 3f); path.lineTo(21f, 11f); path.moveTo(5f, 10f); path.lineTo(5f, 20f); path.lineTo(19f, 20f); path.lineTo(19f, 10f) }
             Kind.PREV -> { path.moveTo(19f, 20f); path.lineTo(9f, 12f); path.lineTo(19f, 4f); path.close(); path.moveTo(5f, 19f); path.lineTo(5f, 5f) }
             Kind.NEXT -> { path.moveTo(5f, 4f); path.lineTo(15f, 12f); path.lineTo(5f, 20f); path.close(); path.moveTo(19f, 5f); path.lineTo(19f, 19f) }
+            Kind.CAMERA -> { rect.set(2f, 6f, 17f, 18f); path.addRoundRect(rect, 2.5f, 2.5f, Path.Direction.CW)
+                path.moveTo(17f, 10f); path.lineTo(22f, 7f); path.lineTo(22f, 17f); path.lineTo(17f, 14f)
+                path.addCircle(9.5f, 12f, 3f, Path.Direction.CW) }
             Kind.DOTS -> { path.addCircle(5f, 12f, 1.2f, Path.Direction.CW); path.addCircle(12f, 12f, 1.2f, Path.Direction.CW); path.addCircle(19f, 12f, 1.2f, Path.Direction.CW) }
         }
         canvas.drawPath(path, paint)

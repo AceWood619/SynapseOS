@@ -44,6 +44,9 @@ class RemoteHomeView(
     private val onJarvisSwitch: (Boolean) -> Unit,
     private val onWeather: () -> Unit,
     private val onNotices: () -> Unit,
+    /** Open a room's camera (entity id, label). Shown only when [cameraAllowed] for the active profile. */
+    private val onCamera: (String, String) -> Unit = { _, _ -> },
+    private val cameraAllowed: () -> Boolean = { true },
 ) : FrameLayout(context) {
     private val g = Glass
     private fun dp(v: Float) = g.dp(context, v)
@@ -89,6 +92,10 @@ class RemoteHomeView(
     private val lightsKey = roomKey(GlassIcon.Kind.BULB, "Lights") { lightsTap() }
     private val tvKey = roomKey(GlassIcon.Kind.TV, "TV") { tvTap() }
     private val roomKeyView = roomKey(GlassIcon.Kind.GRID, "Room") { channel?.let { onOpenRoom(it.room) } }
+    private val camKey = roomKey(GlassIcon.Kind.CAMERA, "Camera") {
+        channel?.let { ch -> ch.room.cameras.firstOrNull()?.let { onCamera(it, com.acewood.synapse.logic.CameraFeed.label(it, ch.room.name, null)) } }
+    }
+    private val camGap = View(context)
 
     init {
         background = g.ground()
@@ -103,6 +110,8 @@ class RemoteHomeView(
             addView(View(context), LinearLayout.LayoutParams(dp(10f), 1))
             addView(tvKey, LinearLayout.LayoutParams(0, dp(72f), 1f))
             addView(View(context), LinearLayout.LayoutParams(dp(10f), 1))
+            addView(camKey, LinearLayout.LayoutParams(0, dp(72f), 1f))
+            addView(camGap, LinearLayout.LayoutParams(dp(10f), 1))
             addView(roomKeyView, LinearLayout.LayoutParams(0, dp(72f), 1f))
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18f) })
         col.addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
@@ -176,6 +185,7 @@ class RemoteHomeView(
             status.text = ""; status.setTextColor(faint)
             enable(rocker, false); enable(dpad, false); enable(sideKeys, false)
             bindKey(lightsKey, "Lights", false, Glass.AMBER, false); bindKey(tvKey, "TV", false, Glass.MINT, false); bindKey(roomKeyView, "Room", false, Glass.BLUE, false)
+            camKey.visibility = View.GONE; camGap.visibility = View.GONE
             return
         }
         chLabel.text = "${ch.label}  OF  ${ch.count}"
@@ -190,6 +200,10 @@ class RemoteHomeView(
         bindKey(lightsKey, if (!ch.hasLights) "No lights" else if (ch.anyLightOn) "Lights on" else "Lights off", ch.anyLightOn, Glass.AMBER, ch.hasLights)
         bindKey(tvKey, if (!ch.hasMedia) "No TV" else if (ch.mediaOn) "TV on" else "TV off", ch.mediaOn, Glass.MINT, ch.hasMedia)
         bindKey(roomKeyView, "Room", false, Glass.BLUE, true)
+        // Camera key only for rooms with a camera, and only for profiles allowed to view cameras.
+        val cam = ch.room.cameras.isNotEmpty() && cameraAllowed()
+        camKey.visibility = if (cam) View.VISIBLE else View.GONE; camGap.visibility = camKey.visibility
+        if (cam) bindKey(camKey, "Camera", false, Glass.RED, true)
     }
 
     private fun bindJarvis(cache: EntityCache?) {

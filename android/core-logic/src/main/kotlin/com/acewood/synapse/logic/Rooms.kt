@@ -21,13 +21,14 @@ data class Room(
     val climate: List<String> = emptyList(),   // climate.* (thermostats)
     val locks: List<String> = emptyList(),     // lock.*
     val sensors: List<String> = emptyList(),   // sensor.* / binary_sensor.* — read-only tiles
+    val cameras: List<String> = emptyList(),   // camera.* — live view (profile level 1+)
 ) {
     val hasControls get() = lights.isNotEmpty() || switches.isNotEmpty() || media.isNotEmpty() ||
         fans.isNotEmpty() || covers.isNotEmpty() || climate.isNotEmpty() || locks.isNotEmpty() ||
         extras.isNotEmpty() || sensors.isNotEmpty()
     /** Something you can actually press. Sensor-only areas (e.g. a car) aren't room channels. */
     val hasPressables get() = lights.isNotEmpty() || switches.isNotEmpty() || extras.isNotEmpty() || media.isNotEmpty() || remotes.isNotEmpty() ||
-        fans.isNotEmpty() || covers.isNotEmpty() || climate.isNotEmpty() || locks.isNotEmpty()
+        fans.isNotEmpty() || covers.isNotEmpty() || climate.isNotEmpty() || locks.isNotEmpty() || cameras.isNotEmpty()
     val primaryMedia get() = media.firstOrNull()
     val primaryRemote get() = remotes.firstOrNull()
 }
@@ -68,6 +69,7 @@ object Rooms {
         val climate = a.entities.filter { it.startsWith("climate.") }
         val locks = a.entities.filter { it.startsWith("lock.") }
         val sensors = a.entities.filter { it.startsWith("sensor.") || it.startsWith("binary_sensor.") }
-        return Room(a.id, a.name, lights, switches, media, extras, remotes, fans, covers, climate, locks, sensors)
+        val cameras = a.entities.filter { it.startsWith("camera.") }
+        return Room(a.id, a.name, lights, switches, media, extras, remotes, fans, covers, climate, locks, sensors, cameras)
     }
 }
