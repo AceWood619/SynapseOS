@@ -23,8 +23,11 @@ The stock file is `/product/media/bootanimation.zip` (read-only). Two options, l
    `adb push os/bootanim/bootanimation.zip /data/local/tmp/` then, as root,
    `mount -o bind /data/local/tmp/bootanimation.zip /product/media/bootanimation.zip && setprop ctl.start bootanim`
    (`setprop ctl.stop bootanim` to stop). A bind mount disappears on reboot, so nothing is permanent.
-2. **Every boot** — bind-mount from the existing boot hook (`/data/adb/synapse/boot.sh`).
-   ❓ Unverified: whether the hook runs before `bootanimation` opens the zip on this device. If it runs later,
-   the stock animation still plays that boot (harmless). The permanent-install image can bake the file in instead.
+2. ~~**Every boot** via the boot hook~~: **doesn't work (verified 2026-10-16, BRAIN).** `phh-on-boot.sh` runs `/data/adb/synapse/boot.sh`
+   about 10 s *after* `boot_completed`, and the boot animation has already ended by then. A bind mount from the hook would never be seen.
+3. **Permanent:** bake `bootanimation.zip` into `/product/media/` in the permanent-install image (`os/PERMANENT_INSTALL.md`).
+   That means flashing, so it needs Mason's explicit go.
+
+✅ Preview verified on the C8 with option 1 (2026-10-16): full-screen and seamless. Afterwards it was unmounted and the stock file's sha256 was unchanged.
 
 Never replace the file inside a flashed partition without Mason's go (see `coord/PROTOCOL.md`).

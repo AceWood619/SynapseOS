@@ -143,8 +143,7 @@ class HomeView(
         homeScroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(body) }
         col.addView(homeScroll,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        body.addView(hero())
-        body.addView(g.spacer(context, h = 12))
+        // House screen (redesign): no hero/now-playing card here, the Remote already shows both.
         body.addView(timerCard)
         body.addView(g.spacer(context, h = 12))
         modesWrap.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(modesRow) })
@@ -170,9 +169,7 @@ class HomeView(
         body.addView(dockWrap)
         body.addView(g.spacer(context, h = 10))
 
-        col.addView(hintLabel)
-        col.addView(g.spacer(context, h = 6))
-        col.addView(console())
+        // No bottom console on House: the Remote's bar (House · mic · More) is one tap back.
         buildDock()
     }
 
