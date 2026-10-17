@@ -18,6 +18,9 @@ class IntercomView(context: Context, private val onBack: () -> Unit) : FrameLayo
     private val g = Glass
     private val body = g.col(context)
     private val roomRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    // One reusable scroller (fix by ChatGPT, 6100c41): render() runs after every room pick, and re-adding
+    // roomRow to a new HorizontalScrollView throws "The specified child already has a parent".
+    private val roomScroller = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(roomRow) }
     private val message = EditText(context)
     private val status = TextView(context)
     private var target: IntercomTarget? = null
@@ -64,7 +67,8 @@ class IntercomView(context: Context, private val onBack: () -> Unit) : FrameLayo
             roomRow.addView(roomKey(room, room == selectedRoom))
             roomRow.addView(g.spacer(context, w = 7))
         }
-        body.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(roomRow) })
+        (roomScroller.parent as? android.view.ViewGroup)?.removeView(roomScroller)
+        body.addView(roomScroller)
         body.addView(g.spacer(context, h = 16))
         body.addView(g.label(context, "QUICK ANNOUNCEMENTS"))
         body.addView(g.spacer(context, h = 7))

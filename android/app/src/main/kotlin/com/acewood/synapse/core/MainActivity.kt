@@ -98,6 +98,7 @@ class MainActivity : Activity() {
     private var pageReady = false
     private lateinit var ambient: AmbientView
     private lateinit var setup: TextView
+    private var setupWizard: SetupWizardView? = null
     private var cfg: NodeConfig? = null
     private val idle = IdleController(120_000)
     @Volatile private var pageOrigin: String? = null
@@ -387,14 +388,18 @@ class MainActivity : Activity() {
         val c = ConfigStore.load(this)
         cfg = c
         if (c == null) {
-            setup.visibility = View.VISIBLE
+            // First run: native setup wizard (provision.py still works: its config.json import wins).
+            setup.visibility = View.GONE
+            if (setupWizard == null) {
+                setupWizard = SetupWizardView(this) { NodeBus.send(NodeBus.Command.CONFIG_CHANGED) }
+                    .also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
+            }
+            setupWizard?.visibility = View.VISIBLE
+            setupWizard?.bringToFront()
             hideSplash()
-            setup.text = "S Y N A P S E\n\n" +
-                "node ready — not configured\n\n" +
-                "run  tools/provision/provision.py\nfrom the SynapseOS repo on your PC\n\n" +
-                "checking for config every 10s…"
             return
         }
+        setupWizard?.let { root.removeView(it) }; setupWizard = null
         setup.visibility = View.GONE
         profiles = ProfileStore.loadOrCreate(this, c)
         // Mason's remote rule: remember the last profile (no "who are you?" after every reboot/update).
@@ -504,16 +509,17 @@ class MainActivity : Activity() {
         }
         if (linkStrip == null) {
             linkStrip = TextView(this).apply {
-                textSize = 12f; setTextColor(Glass.INK); typeface = Glass.disp(this@MainActivity)
-                letterSpacing = 0.04f; gravity = Gravity.CENTER; maxLines = 2
-                background = Glass.panel(this@MainActivity, 14f, Glass.withAlpha(Glass.AMBER, 70))
-                val padH = Glass.dp(this@MainActivity, 14f); val padV = Glass.dp(this@MainActivity, 8f)
-                setPadding(padH, padV, padH, padV)
+                // Solid banner over the top bar (redesign): covers the header cleanly instead of overlapping titles.
+                textSize = 13f; setTextColor(Color.rgb(255, 217, 138)); typeface = Glass.bodyBold(this@MainActivity)
+                gravity = Gravity.CENTER; maxLines = 2
+                background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(Color.rgb(58, 42, 12), Color.rgb(40, 29, 8))).apply { setStroke(Glass.dp(this@MainActivity, 1f), Color.rgb(138, 106, 34)) }
+                val padH = Glass.dp(this@MainActivity, 16f)
+                setPadding(padH, 0, padH, 0)
+                minHeight = Glass.dp(this@MainActivity, 56f)
                 visibility = View.GONE
                 tap { HaRepository.reconnectNow(); text = "Reconnecting to Home Assistant…" }
-                root.addView(this, FrameLayout.LayoutParams(-1, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP).apply {
-                    val m = Glass.dp(this@MainActivity, 10f); leftMargin = m; rightMargin = m; topMargin = m
-                })
+                root.addView(this, FrameLayout.LayoutParams(-1, Glass.dp(this@MainActivity, 56f), Gravity.TOP))
             }
         }
         applyProfileToHome()
@@ -644,6 +650,8 @@ class MainActivity : Activity() {
                     "diagnostics" -> showOverlay(diagnosticsView) { it.open() }
                     "notices" -> showOverlay(noticesView) { it.open() }
                     "ha" -> showHa()
+                    "jarvis-command" -> if (HaRepository.connected) showHa("/jarvis-command")
+                        else Toast.makeText(this, "Jarvis Command needs Home Assistant. It's offline right now.", Toast.LENGTH_LONG).show()
                     "music" -> showHa("/media-browser/browser")
                     "browser" -> startActivity(Intent(this, BrowserActivity::class.java))
                     "camera" -> startActivity(Intent(this, CameraActivity::class.java))
@@ -658,7 +666,8 @@ class MainActivity : Activity() {
         if (app.adminOnly) askPin { run() } else run()
     }
     private fun showRoomPad(room: com.acewood.synapse.logic.Room) = showOverlay(roomPad) {
-        val allowed = activeProfile?.layout?.rooms.orEmpty().map { it.lowercase() }.toSet()
+        // Same order and filter as the Remote's channels, so "CH 3" means the same room on both screens.
+        val allowed = activeProfile?.layout?.rooms.orEmpty().map { it.trim().lowercase().replace(' ', '_') }.filter { it.isNotEmpty() }.toSet()
         val rooms = if (allowed.isEmpty()) HaRepository.rooms else HaRepository.rooms.filter { it.id.lowercase() in allowed }
         it.open(room, rooms)
     }

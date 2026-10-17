@@ -42,6 +42,7 @@ object AppCatalog {
         App("Room diagnostics", "⌁", Target.Internal("diagnostics"), adminOnly = true),
         App("System notices", "⚑", Target.Internal("notices"), adminOnly = true),
         App("Home Assistant", "⌂", Target.Internal("ha")),
+        App("Jarvis Command", "⌘", Target.Internal("jarvis-command")),   // HA dashboard /jarvis-command (ChatGPT, 19314b9)
         App("Music", "♫", Target.Internal("music")),
         App("Synapse Browser", "◍", Target.Internal("browser")),
         App("Synapse Camera", "◎", Target.Internal("camera")),

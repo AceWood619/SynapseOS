@@ -42,8 +42,8 @@ class RoomPadView(
     private var downY = 0f
     private var dragging = false   // don't rebuild under a finger on a slider
     private val bodyCol = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-    private val title = tv(22f, Glass.INK, g.disp(context))
-    private val subtitle = tv(12f, Glass.INK_DIM, g.body(context))
+    private val title = tv(24f, Glass.INK, g.disp(context)).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+    private val subtitle = tv(11f, Glass.BLUE, g.bodyBold(context)).apply { letterSpacing = 0.14f; maxLines = 1 }
 
     // a small, friendly colour palette for colour-capable lights
     private val swatches = listOf(
@@ -63,13 +63,12 @@ class RoomPadView(
         }
         addView(outer, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         outer.addView(g.row(context).apply {
-            addView(key("‹  BACK", Glass.INK_DIM) { onBack() })
-            addView(g.spacer(context, w = 14))
-            addView(g.col(context).apply { addView(title); addView(subtitle) })
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(key("‹", Glass.INK_DIM) { switchRoom(-1) })
+            addView(iconKey(GlassIcon.Kind.CHEVRON_LEFT, "Back to remote", 14f) { onBack() }, LinearLayout.LayoutParams(g.dp(context, 44f), g.dp(context, 44f)))
+            addView(g.col(context).apply { addView(subtitle); addView(title) },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = g.dp(context, 12f); rightMargin = g.dp(context, 8f) })
+            addView(iconKey(GlassIcon.Kind.CHEVRON_LEFT, "Previous room", 14f, filled = true) { switchRoom(-1) }, LinearLayout.LayoutParams(g.dp(context, 40f), g.dp(context, 44f)))
             addView(g.spacer(context, w = 6))
-            addView(key("›", Glass.INK_DIM) { switchRoom(1) })
+            addView(iconKey(GlassIcon.Kind.CHEVRON_RIGHT, "Next room", 14f, filled = true) { switchRoom(1) }, LinearLayout.LayoutParams(g.dp(context, 40f), g.dp(context, 44f)))
         })
         outer.addView(g.spacer(context, h = 12))
         outer.addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(bodyCol) },
@@ -143,15 +142,10 @@ class RoomPadView(
             if (sig == lastSig) return@post
             lastSig = sig
             val m = RoomControl.build(r, cache)
-            title.text = "CH ${roomIndex + 1} · ${r.name}"
+            title.text = r.name
             subtitle.text = buildString {
-                val parts = mutableListOf<String>()
-                if (m.lightCount > 0) parts += "${m.lightCount} ${if (m.lightCount == 1) "light" else "lights"}"
-                if (m.media.isNotEmpty()) parts += "${m.media.size} media"
-                if (m.climate.isNotEmpty()) parts += "${m.climate.size} climate"
-                if (m.covers.isNotEmpty()) parts += "${m.covers.size} cover"
-                append(parts.joinToString(" · "))
-                if (m.lightsAmbiguous) append("  ⚠ map lights")
+                append("CH ${roomIndex + 1} OF ${roomList.size.coerceAtLeast(1)}")
+                if (m.lightsAmbiguous) append("  ·  MAP LIGHTS")
             }
             bodyCol.removeAllViews()
             section("LIGHTS", m.lights.map { lightCard(it) })
@@ -183,12 +177,16 @@ class RoomPadView(
 
     // ---------- LIGHT ----------
     private fun lightCard(t: RoomControl.LightTile): View = g.col(context).apply {
-        background = g.tile(context, Glass.AMBER, t.isOn, 16f)
-        setPadding(g.dp(context, 15f), g.dp(context, 13f), g.dp(context, 14f), g.dp(context, 14f))
+        background = GradientDrawable().apply {
+            cornerRadius = g.dp(context, 24f).toFloat()
+            setColor(if (t.isOn) Glass.withAlpha(Glass.AMBER, 22) else Color.argb(10, 255, 255, 255))
+            setStroke(g.dp(context, 1f), if (t.isOn) Glass.withAlpha(Glass.AMBER, 95) else Color.argb(46, 130, 170, 255))
+        }
+        setPadding(g.dp(context, 16f), g.dp(context, 15f), g.dp(context, 16f), g.dp(context, 16f))
         addView(g.row(context).apply {
             addView(g.col(context).apply {
-                addView(tv(15f, Glass.INK, g.body(context)).apply { text = t.light.name; setTypeface(typeface, Typeface.BOLD) })
-                addView(tv(11f, if (t.isOn) Glass.AMBER else Glass.INK_FAINT, g.body(context)).apply {
+                addView(tv(16f, Glass.INK, g.bodyBold(context)).apply { text = t.light.name })
+                addView(tv(13f, if (t.isOn) Color.rgb(255, 217, 138) else Glass.INK_FAINT, g.body(context)).apply {
                     text = when {
                         !t.available -> "unavailable"
                         t.isOn && t.brightnessPct != null -> "on · ${t.brightnessPct}%"
@@ -199,7 +197,8 @@ class RoomPadView(
             addView(toggleKey(t.isOn, Glass.AMBER) { HaRepository.toggle(cacheTargets(t), !t.isOn); refresh() })
         })
         if (t.isOn && t.dimmable) {
-            addView(g.spacer(context, h = 10))
+            addView(g.spacer(context, h = 12))
+            addView(capLabel("BRIGHTNESS"))
             addView(slider(t.brightnessPct ?: 50, 100, Glass.AMBER) { pct ->
                 val targets = cacheTargets(t)
                 HaRepository.optimisticAttribute(targets, "brightness", (pct * 255 / 100).coerceIn(1, 255))
@@ -207,11 +206,11 @@ class RoomPadView(
             })
         }
         if (t.isOn && t.colorCapable) {
-            addView(g.spacer(context, h = 10)); addView(swatchRow(t))
+            addView(g.spacer(context, h = 12)); addView(capLabel("COLOR")); addView(g.spacer(context, h = 6)); addView(swatchRow(t))
         }
         if (t.isOn && t.colorTempCapable) {
-            addView(g.spacer(context, h = 8))
-            addView(tv(10f, Glass.INK_FAINT, g.body(context)).apply { text = "WARM  ·—————·  COOL"; letterSpacing = 0.05f })
+            addView(g.spacer(context, h = 12))
+            addView(capLabel("WARM  ←  →  COOL"))
             addView(slider(50, 100, Glass.BLUE) { pct ->
                 val kelvin = (2200 + (pct / 100.0) * (6500 - 2200)).roundToInt()
                 HaRepository.callService("light", "turn_on", cacheTargets(t), mapOf("color_temp_kelvin" to kelvin))
@@ -219,20 +218,25 @@ class RoomPadView(
         }
     }
 
-    private fun swatchRow(t: RoomControl.LightTile): View = LinearLayout(context).apply {
-        orientation = LinearLayout.HORIZONTAL
-        swatches.forEach { (_, rgb) ->
-            val c = Color.rgb(rgb[0], rgb[1], rgb[2])
-            addView(View(context).apply {
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(c); setStroke(g.dp(context, 1f), Glass.STROKE) }
-                val s = g.dp(context, 30f)
-                layoutParams = LinearLayout.LayoutParams(s, s).apply { rightMargin = g.dp(context, 8f) }
-                tap {
-                    HaRepository.callService("light", "turn_on", cacheTargets(t), mapOf("rgb_color" to listOf(rgb[0], rgb[1], rgb[2])))
+    /** Two rows of five rounded colour chips that fill the card width (big thumb targets). */
+    private fun swatchRow(t: RoomControl.LightTile): View = g.col(context).apply {
+        swatches.chunked(5).forEachIndexed { row, chunk ->
+            if (row > 0) addView(g.spacer(context, h = 8))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                chunk.forEachIndexed { i, (name, rgb) ->
+                    if (i > 0) addView(View(context), LinearLayout.LayoutParams(g.dp(context, 8f), 1))
+                    addView(View(context).apply {
+                        contentDescription = name
+                        background = GradientDrawable().apply { cornerRadius = g.dp(context, 12f).toFloat(); setColor(Color.rgb(rgb[0], rgb[1], rgb[2])) }
+                        tap { HaRepository.callService("light", "turn_on", cacheTargets(t), mapOf("rgb_color" to listOf(rgb[0], rgb[1], rgb[2]))) }
+                    }, LinearLayout.LayoutParams(0, g.dp(context, 40f), 1f))
                 }
             })
         }
     }
+
+    private fun capLabel(text: String): View = tv(11.5f, Color.rgb(185, 164, 110), g.bodyBold(context)).apply { this.text = text; letterSpacing = 0.1f }
 
     // ---------- MEDIA ----------
     private fun mediaStrip(t: RoomControl.MediaTile): View = g.col(context).apply {
@@ -254,9 +258,9 @@ class RoomPadView(
             addView(g.spacer(context, h = 12))
             addView(g.row(context).apply {
                 gravity = Gravity.CENTER
-                addView(roundKey("⏮") { send(MediaRemote.previous(t.entityId)) }); addView(g.spacer(context, w = 12))
-                addView(roundKey(if (t.isPlaying) "⏸" else "▶", Glass.MINT) { send(MediaRemote.playPause(t.entityId)) }); addView(g.spacer(context, w = 12))
-                addView(roundKey("⏭") { send(MediaRemote.next(t.entityId)) })
+                addView(iconKey(GlassIcon.Kind.PREV, "Previous", 14f, filled = true) { send(MediaRemote.previous(t.entityId)) }, LinearLayout.LayoutParams(g.dp(context, 56f), g.dp(context, 48f))); addView(g.spacer(context, w = 12))
+                addView(iconKey(if (t.isPlaying) GlassIcon.Kind.PAUSE else GlassIcon.Kind.PLAY, "Play or pause", 14f, filled = true, accent = Glass.MINT) { send(MediaRemote.playPause(t.entityId)) }, LinearLayout.LayoutParams(g.dp(context, 56f), g.dp(context, 48f))); addView(g.spacer(context, w = 12))
+                addView(iconKey(GlassIcon.Kind.NEXT, "Next", 14f, filled = true) { send(MediaRemote.next(t.entityId)) }, LinearLayout.LayoutParams(g.dp(context, 56f), g.dp(context, 48f)))
             })
         }
         val vol = t.volumePct
@@ -305,23 +309,23 @@ class RoomPadView(
     private fun dpad(t: RoomControl.MediaTile): View = g.col(context).apply {
         gravity = Gravity.CENTER_HORIZONTAL
         fun b(btn: MediaRemote.Button): () -> Unit = { MediaRemote.press(btn, t.remoteEntityId, t.entityId)?.let { send(it) } }
-        addView(dKey("▲", b(MediaRemote.Button.UP)))
+        addView(dIcon(GlassIcon.Kind.CHEVRON_UP, "Up", b(MediaRemote.Button.UP)))
         addView(g.spacer(context, h = 8))
         addView(g.row(context).apply {
             gravity = Gravity.CENTER
-            addView(dKey("◀", b(MediaRemote.Button.LEFT))); addView(g.spacer(context, w = 10))
+            addView(dIcon(GlassIcon.Kind.CHEVRON_LEFT, "Left", b(MediaRemote.Button.LEFT))); addView(g.spacer(context, w = 10))
             addView(dKey("OK", b(MediaRemote.Button.OK), Glass.BLUE)); addView(g.spacer(context, w = 10))
-            addView(dKey("▶", b(MediaRemote.Button.RIGHT)))
+            addView(dIcon(GlassIcon.Kind.CHEVRON_RIGHT, "Right", b(MediaRemote.Button.RIGHT)))
         })
         addView(g.spacer(context, h = 8))
-        addView(dKey("▼", b(MediaRemote.Button.DOWN)))
+        addView(dIcon(GlassIcon.Kind.CHEVRON_DOWN, "Down", b(MediaRemote.Button.DOWN)))
         addView(g.spacer(context, h = 12))
         addView(g.row(context).apply {
             gravity = Gravity.CENTER
-            addView(roundKey("↩ back") { b(MediaRemote.Button.BACK)() }); addView(g.spacer(context, w = 8))
-            addView(roundKey("⌂ home") { b(MediaRemote.Button.HOME)() }); addView(g.spacer(context, w = 8))
-            addView(roundKey("↺") { b(MediaRemote.Button.REPLAY)() }); addView(g.spacer(context, w = 8))
-            addView(roundKey("ⓘ") { b(MediaRemote.Button.INFO)() })
+            addView(roundKey("Back") { b(MediaRemote.Button.BACK)() }); addView(g.spacer(context, w = 8))
+            addView(roundKey("Home") { b(MediaRemote.Button.HOME)() }); addView(g.spacer(context, w = 8))
+            addView(roundKey("Replay") { b(MediaRemote.Button.REPLAY)() }); addView(g.spacer(context, w = 8))
+            addView(roundKey("Info") { b(MediaRemote.Button.INFO)() })
         })
     }
 
@@ -384,9 +388,9 @@ class RoomPadView(
                 addView(tv(15f, Glass.INK, g.body(context)).apply { text = t.name; setTypeface(typeface, Typeface.BOLD) })
                 addView(tv(11f, Glass.INK_DIM, g.body(context)).apply { text = t.state + (t.positionPct?.let { "  ·  $it%" } ?: "") })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(roundKey("▲") { HaRepository.callService("cover", "open_cover", listOf(t.entityId)); refresh() }); addView(g.spacer(context, w = 7))
-            addView(roundKey("■") { HaRepository.callService("cover", "stop_cover", listOf(t.entityId)); refresh() }); addView(g.spacer(context, w = 7))
-            addView(roundKey("▼") { HaRepository.callService("cover", "close_cover", listOf(t.entityId)); refresh() })
+            addView(roundKey("Open") { HaRepository.callService("cover", "open_cover", listOf(t.entityId)); refresh() }); addView(g.spacer(context, w = 7))
+            addView(roundKey("Stop") { HaRepository.callService("cover", "stop_cover", listOf(t.entityId)); refresh() }); addView(g.spacer(context, w = 7))
+            addView(roundKey("Close") { HaRepository.callService("cover", "close_cover", listOf(t.entityId)); refresh() })
         })
         val pos = t.positionPct
         if (t.supportsPosition && pos != null) {
@@ -463,13 +467,42 @@ class RoomPadView(
         })
     }
 
-    private fun toggleKey(on: Boolean, accent: Int, onTap: () -> Unit): View =
-        tv(16f, if (on) accent else Glass.INK_DIM, g.disp(context)).apply {
-            text = if (on) "⏻" else "○"; gravity = Gravity.CENTER
-            background = g.tile(context, accent, on, 13f)
-            val s = g.dp(context, 46f); layoutParams = LinearLayout.LayoutParams(s, s)
-            tap { onTap() }
+    /** A pill on/off switch (64×36 dp, 48 dp tall touch area). */
+    private fun toggleKey(on: Boolean, accent: Int, onTap: () -> Unit): View = FrameLayout(context).apply {
+        contentDescription = if (on) "Turn off" else "Turn on"
+        layoutParams = LinearLayout.LayoutParams(g.dp(context, 68f), g.dp(context, 48f))
+        addView(FrameLayout(context).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = g.dp(context, 18f).toFloat()
+                setColor(if (on) accent else Color.argb(28, 255, 255, 255))
+                setStroke(g.dp(context, 1f), if (on) accent else Color.argb(70, 130, 170, 255))
+            }
+            addView(View(context).apply {
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (on) Color.rgb(29, 20, 4) else Glass.INK_DIM) }
+            }, LayoutParams(g.dp(context, 28f), g.dp(context, 28f), (if (on) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL).apply {
+                leftMargin = g.dp(context, 4f); rightMargin = g.dp(context, 4f)
+            })
+        }, LayoutParams(g.dp(context, 64f), g.dp(context, 36f), Gravity.CENTER))
+        tap { onTap() }
+    }
+
+    private fun iconKey(kind: GlassIcon.Kind, label: String, radius: Float, filled: Boolean = false, accent: Int = Glass.INK_DIM, onTap: () -> Unit): View = FrameLayout(context).apply {
+        contentDescription = label
+        background = GradientDrawable().apply {
+            cornerRadius = g.dp(context, radius).toFloat()
+            if (filled) setColor(Color.argb(14, 255, 255, 255)) else setStroke(g.dp(context, 1f), Color.argb(64, 130, 170, 255))
         }
+        addView(GlassIcon(context, kind, if (accent == Glass.INK_DIM) Color.rgb(201, 212, 242) else accent, 2.2f), LayoutParams(g.dp(context, 18f), g.dp(context, 18f), Gravity.CENTER))
+        tap { onTap() }
+    }
+
+    private fun dIcon(kind: GlassIcon.Kind, label: String, onTap: () -> Unit): View = FrameLayout(context).apply {
+        contentDescription = label
+        background = g.tile(context, Glass.INK_DIM, false, 18f)
+        addView(GlassIcon(context, kind, Glass.INK, 2.4f), LayoutParams(g.dp(context, 24f), g.dp(context, 24f), Gravity.CENTER))
+        val s = g.dp(context, 68f); layoutParams = LinearLayout.LayoutParams(s, s)
+        tap { onTap() }
+    }
 
     private fun roundKey(label: String, accent: Int = Glass.INK_DIM, onTap: () -> Unit): View =
         tv(13f, accent, g.disp(context)).apply {

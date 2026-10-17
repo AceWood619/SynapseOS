@@ -22,6 +22,13 @@ object ConfigStore {
         return try { NodeConfig.fromJson(s) } catch (e: Exception) { null }
     }
 
+    /** Save validated setup straight to app-private storage (setup wizard); never logs the token-bearing JSON. */
+    fun save(ctx: Context, cfg: NodeConfig) {
+        val errors = cfg.validate()
+        require(errors.isEmpty()) { errors.joinToString("; ") }
+        check(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, cfg.toJson()).commit()) { "Unable to save Synapse setup" }
+    }
+
     /** Returns true if a new config was imported. Synchronized: the service and the screen both poll for the file. */
     @Synchronized
     fun importIfPresent(ctx: Context): Boolean {
