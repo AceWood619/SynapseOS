@@ -1,0 +1,14 @@
+{
+  "node_id": "livingroom-01",
+  "room": "Living Room",
+  "ha_url": "http://homeassistant.local:8123",
+  "ha_token": "<long-lived token: provision.py fills this in, never commit it>",
+  "dashboard_path": "/lovelace/0",
+  "idle_seconds": 120,
+  "ambient_brightness": 0.02,
+  "pin": "<4+ digits>",
+  "api_port": 8765,
+  "api_key": "<32 hex chars>",
+  "heartbeat_seconds": 60,
+  "kiosk": true
+}
