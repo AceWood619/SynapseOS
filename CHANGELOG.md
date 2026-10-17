@@ -2,6 +2,19 @@
 
 All notable SynapseOS changes are recorded here. Device verification is separate from local build verification and is attributed to HANDS in `coord/REQUESTS.md`.
 
+## 0.3.56 → 0.3.58 — Redesign B ("Remote") — BRAIN, 2026-10-16 (installed on the C8 by Claude)
+
+Mason picked mockup B from the SynapseOS Redesign canvas and asked Claude to keep going without approvals.
+
+- **Remote home** (`RemoteHomeView`, `RemoteHome`): a swipeable room "channel" card, VOL rocker, D-pad + OK, mute/play/back, Lights/TV/Room keys, house modes, and a House · mic · More bar. The old home is now the **House** screen.
+- **Fonts:** Sora + Manrope (OFL, subset, ~180 KB) on every screen. Icons are drawn in code (`GlassIcon`).
+- **Ambient:** a true-black root that never moves, a content-only burn-in nudge, five-column forecast. Fixes Home showing through and clipped edges.
+- **Room pad:** new header, pill switches, chip colour grid, drawn transport/D-pad icons. The offline strip is now a solid top banner.
+- **From ChatGPT's local work (landed with its review fixes):** Intercom crash fix, first-run setup wizard (SAVE gated on a successful HA test of the same URL+token), Jarvis Command entry with an offline message.
+- **Boot animation** previewed on the real phone via a temporary bind mount (unmounted after; stock file sha unchanged).
+
+Verified on the device: 0.3.58 (sha `fa7d85b8…687f`) installed in place, Synapse stays the HOME app, no crash-buffer entries, and screenshots of Remote home, room pad and boot animation reviewed. Not yet verified: physical button presses (VOL/D-pad/lights) while the household was using the TVs.
+
 ## Unreleased — R-124 Part 6 polish + boot animation — BRAIN, 2026-10-15
 
 ### Added
