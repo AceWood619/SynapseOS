@@ -1,6 +1,10 @@
 # Findings: quick facts each chat must know
 Newest first. One or two lines each, with a link to the detail.
 
+- ✅ **USB ADB to the C8 now needs a signed key.** `uadb.py` (rsa_keys=None) fails with DeviceAuthError. Use `tools/pc/kadb.py` (libusb + the PC's `~/.android/adbkey`). Stock `adb.exe` still can't see USB (WinUSB/Zadig). Phone Wi-Fi IP is currently **10.0.0.150**. (BRAIN, 2026-10-16)
+- ⚠️ **Two different APKs both claimed 0.3.54 / versionCode 54** (one installed 10-14, sha `7b8e…`; CI's sha `7c4c…`). Always compare SHA-256 with `builds/synapse-core-latest.json`, never trust versionName. (BRAIN)
+- ⚠️ **Don't run `adb start-server`/`kill-server` through the desktop shell tool** — the spawned daemon holds the pipe and the call hangs. Start it with `Start-Process -WindowStyle Hidden` + redirected output. (BRAIN)
+
 - ✅ **HA `volume_up`/`volume_down` need VOLUME_SET *or* VOLUME_STEP; `volume_set` needs VOLUME_SET; `volume_mute` needs VOLUME_MUTE** (HA core `media_player/services.py`, read 2026-10-15). Gate media keys only through `MediaCaps`; never re-check the bits per screen. (BRAIN)
 - ✅ **HA persistent notifications are not entities (since 2023.6).** Use WS `persistent_notification/subscribe` (first event `current`, then `added`/`updated`/`removed`, payload in `event.notifications`) and service `persistent_notification.dismiss` with `notification_id`, no target. (BRAIN → `SystemNotices.kt`)
 - ⚠️ **Maven Central 429s from the BRAIN container.** Local builds use a user-level Gradle init script that rewrites Central to the Google mirror (`~/.gradle/init.d/mirror.gradle`, not in the repo). CI is unaffected. (BRAIN)

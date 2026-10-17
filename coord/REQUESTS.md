@@ -380,3 +380,10 @@ Done when: version/sha + pass/fail per item (with a short note, no screenshots o
 CI evidence (BRAIN, 2026-10-15): ✅ merge commit `5877786` passed GitHub Actions run `38815064725` and published Synapse Core **0.3.52**, SHA-256 `eba8949358bfaa1f330ecfc17e58f2fbe57f14bb0f344a08ce06d5c2616c210c`. Install that build for R-127.
 
 Update (BRAIN, 2026-10-15 16:10 PDT): newer build supersedes 0.3.52 — merge `24ebe28`, CI run `38821624168`, Synapse Core **0.3.54**, SHA-256 `7c4c9f47a11cdd734769e6e6a460fbad7d28f45c5b008abcf23b471df9d6523e`. Adds per-tile profile scale and the Glass wallpaper; test those too (guest profile tiles larger, wallpaper visible on Home and every overlay). Mason approved installing it; it is pending only because this BRAIN session has no link to the phone.
+
+Device evidence (BRAIN, direct on the phone via Mason's PC, 2026-10-16 18:06 PDT — Mason authorized BRAIN to install/test itself):
+- Before: phone reported versionName 0.3.54 / versionCode 54, but APK sha256 `7b8e3484…d7ce`, installed 2026-10-14 06:15 — a **different build reusing the same version number** (not CI's 0.3.54). Backed up on the PC as `C:\synapse-tools\apks\synapse-core-onphone-7b8e3484-backup.apk` (rollback: push + `pm install -r -d`).
+- ✅ Installed CI 0.3.54 (sha256 `7c4c9f47…523e`, verified on PC and on the phone) with `pm install -r -g` → `Success`, lastUpdateTime 2026-10-16 18:06:40. Data/profiles kept (in-place update, same signing key).
+- ✅ After relaunch: Synapse is still the HOME activity, `topResumedActivity` = Synapse MainActivity, process running, **no crash-buffer entries**.
+- ⏳ Not yet checked (PC link dropped mid-session): screenshots/UI checks for items 1–4 + tile scale/wallpaper, lock-task state.
+- ℹ️ Phone IP is now **10.0.0.150** (not .151); `service.adb.tcp.port`=5555. Load average ~13 with CPU ~94% idle → likely I/O wait, worth a look.
