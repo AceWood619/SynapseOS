@@ -73,26 +73,54 @@ class HaWsClient(
         return "$wsBase/api/websocket"
     }
 
-    fun start() { closed = false; connect() }
-    fun stop() { closed = true; try { ws?.close(1000, "bye") } catch (_: Exception) {}; ws = null }
+    /** Serializes every connection-state transition (start/stop/reconnect/backoff timer/drop). */
+    private val lifecycle = Any()
+
+    fun start() { synchronized(lifecycle) { closed = false; tryConnect(null) } }
+    fun stop() {
+        synchronized(lifecycle) {
+            closed = true
+            attempt.incrementAndGet()   // every callback from the old socket is now stale and ignored
+            connected = false; authed = false; connecting = false
+        }
+        try { ws?.close(1000, "bye") } catch (_: Exception) {}
+        ws = null
+    }
 
     /**
      * Skip the backoff wait (network came back, user tapped RETRY, screen woke). No-op while
      * connected, while an attempt is already in flight, or after an auth failure (needs new config).
      */
     fun reconnectNow() {
-        if (closed || connected || connecting) return
-        generation.incrementAndGet()
-        backoffMs = 1_000L
-        connect()
+        synchronized(lifecycle) {
+            if (closed || connected || connecting) return
+            generation.incrementAndGet()
+            backoffMs = 1_000L
+            tryConnect(null)
+        }
+    }
+
+    /**
+     * The only way a socket is opened: under [lifecycle], and only when nothing is connected or in
+     * flight. [gen] (from a backoff timer) must still be current, so a manual reconnect cancels it.
+     */
+    private fun tryConnect(gen: Long?) {
+        synchronized(lifecycle) {
+            if (closed || connected || connecting) return
+            if (gen != null && gen != generation.get()) return
+            connect()
+        }
     }
 
     private val attempt = AtomicLong(0)
 
     private fun dropped(myAttempt: Long) {
-        if (myAttempt != attempt.get()) return   // a superseded socket closing late must not mark the live one down
-        val was = connected
-        connected = false; authed = false; connecting = false
+        val was: Boolean
+        synchronized(lifecycle) {
+            if (myAttempt != attempt.get()) return   // a superseded socket closing late must not mark the live one down
+            was = connected
+            connected = false; authed = false; connecting = false
+        }
         failPending()
         if (was) onConnection(false)
         scheduleReconnect()
@@ -110,7 +138,10 @@ class HaWsClient(
         val myAttempt = attempt.incrementAndGet()
         val req = Request.Builder().url(wsUrl()).build()
         ws = http.newWebSocket(req, object : WebSocketListener() {
-            override fun onMessage(webSocket: WebSocket, text: String) = handle(text)
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                if (myAttempt != attempt.get()) return   // late frame from a superseded socket: ignore
+                handle(text)
+            }
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) { /* TTS is not requested; STT events are text frames. */ }
             override fun onOpen(webSocket: WebSocket, response: Response) { Log.i(SynapseApp.TAG, "HA ws open") }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -129,7 +160,7 @@ class HaWsClient(
         val gen = generation.get()
         Thread {
             try { Thread.sleep(delay) } catch (_: Exception) {}
-            if (!closed && gen == generation.get() && !connected && !connecting) connect()
+            tryConnect(gen)
         }.start()
     }
 

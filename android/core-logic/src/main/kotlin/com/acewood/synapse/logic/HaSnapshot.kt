@@ -32,23 +32,33 @@ object HaSnapshotCodec {
 
     fun source(haUrl: String): String = haUrl.trim().trimEnd('/').lowercase()
 
+    private fun sensitiveKey(k: String): Boolean {
+        val key = k.lowercase()
+        return key in DROP_EXACT || DROP_FRAGMENTS.any { key.contains(it) }
+    }
+
+    private val SECRET_IN_TEXT = Regex("(token|access_token|api_key|apikey|key|password|secret|sig|signature)=", RegexOption.IGNORE_CASE)
+
     fun sanitize(e: Entity): Entity {
         val attrs = LinkedHashMap<String, Any?>()
         for ((k, v) in e.attributes) {
-            val key = k.lowercase()
-            if (key in DROP_EXACT || DROP_FRAGMENTS.any { key.contains(it) }) continue
-            val clean = cleanValue(v, depth = 0) ?: if (v == null) null else continue
-            attrs[k] = clean
+            if (sensitiveKey(k)) continue
+            if (v == null) { attrs[k] = null; continue }
+            attrs[k] = cleanValue(v, depth = 0) ?: continue
         }
         return Entity(e.entityId, e.state.take(MAX_STRING), attrs)
     }
 
-    /** Returns null for values that should be dropped (too deep). Strings/lists are capped. */
+    /**
+     * Returns null for values that should be dropped: too deep, or text carrying a credential-looking
+     * query parameter. Maps are filtered by key at every level (review finding, ChatGPT 2026-10-16).
+     */
     private fun cleanValue(v: Any?, depth: Int): Any? = when (v) {
         null, is Boolean, is Number -> v
-        is String -> if (v.contains("token=", ignoreCase = true)) null else v.take(MAX_STRING)
+        is String -> if (SECRET_IN_TEXT.containsMatchIn(v)) null else v.take(MAX_STRING)
         is List<*> -> if (depth >= 2) null else v.take(MAX_LIST).mapNotNull { cleanValue(it, depth + 1) }
         is Map<*, *> -> if (depth >= 2) null else v.entries.take(MAX_LIST)
+            .filterNot { (k, _) -> sensitiveKey(k.toString()) }
             .mapNotNull { (k, x) -> cleanValue(x, depth + 1)?.let { k.toString() to it } }.toMap()
         else -> v.toString().take(MAX_STRING)
     }

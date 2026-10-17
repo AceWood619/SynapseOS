@@ -110,15 +110,20 @@ object HaRepository {
                 if (now - lastForcedMs < 10_000) { schedule.markDirty(); return }
                 lastForcedMs = now
             } else if (!schedule.shouldSave(c.connected, now)) return
-            schedule.saved(now)
+            schedule.saved(now)   // claim this slot; un-claimed below if the write fails
         }
         val snap = HaSnapshot(now, HaSnapshotCodec.source(cfg.haUrl), lastAreas, c.cache.all())
         io.execute {
             runCatching {
                 val tmp = File(f.parentFile, f.name + ".tmp")
                 tmp.writeText(HaSnapshotCodec.encode(snap))
-                if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
-            }.onFailure { android.util.Log.w(SynapseApp.TAG, "snapshot save failed: ${it.message}") }
+                // Atomic replace: the old snapshot stays intact until the new one is fully written.
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            }.onFailure {
+                android.util.Log.w(SynapseApp.TAG, "snapshot save failed: ${it.message}")
+                synchronized(schedule) { schedule.markDirty() }   // retry on the next change/minute
+            }
         }
     }
     private var lastForcedMs = 0L

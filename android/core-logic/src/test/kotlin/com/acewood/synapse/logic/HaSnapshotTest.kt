@@ -101,3 +101,18 @@ class LinkStatusTest {
         assertTrue(s.shouldSave(true, 60_000))
     }
 }
+
+class HaSnapshotNestedSecretsTest {
+    @Test fun nestedCredentialKeysAndSignedTextAreDropped() {
+        val clean = HaSnapshotCodec.sanitize(Entity("sensor.x", "1", mapOf(
+            "config" to mapOf("access_token" to "abc", "Api_Key" to "k", "name" to "ok", "inner" to mapOf("password" to "p", "mode" to "auto")),
+            "list" to listOf(mapOf("secret" to "s", "label" to "a"), "https://cam/x?sig=123", "plain"),
+            "url" to "http://x/y?api_key=zzz")))
+        @Suppress("UNCHECKED_CAST") val cfg = clean.attributes["config"] as Map<String, Any?>
+        assertEquals(setOf("name", "inner"), cfg.keys)
+        @Suppress("UNCHECKED_CAST") assertEquals(mapOf("mode" to "auto"), cfg["inner"] as Map<String, Any?>)
+        assertEquals(listOf(mapOf("label" to "a"), "plain"), clean.attributes["list"])
+        assertFalse(clean.attributes.containsKey("url"))
+        assertFalse(HaSnapshotCodec.encode(HaSnapshot(1, "x", emptyList(), listOf(Entity("sensor.x", "1", mapOf("c" to mapOf("token" to "SECRET")))))).contains("SECRET"))
+    }
+}

@@ -83,6 +83,7 @@ class RemoteHomeView(
 
     // house modes (first four that exist in HA)
     private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private val modeTapAt = HashMap<String, Long>()
 
     // room keys
     private val lightsKey = roomKey(GlassIcon.Kind.BULB, "Lights") { lightsTap() }
@@ -215,7 +216,13 @@ class RemoteHomeView(
                     setColor(if (on) Glass.withAlpha(accent, 40) else Color.argb(8, 255, 255, 255))
                     setStroke(dp(1f), if (on) Glass.withAlpha(accent, 170) else Color.argb(46, 130, 170, 255))
                 }
-                tap { cache?.let { HomeView.toggleMode(id, on, it) }; postDelayed({ lastSig = null; refresh() }, 150) }
+                tap {
+                    // Debounce (review #6): one toggle per mode until HA's echo or 1.5 s, so a double-tap can't flip it twice.
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (now - (modeTapAt[id] ?: 0L) < 1_500L) return@tap
+                    modeTapAt[id] = now
+                    cache?.let { HomeView.toggleMode(id, on, it) }; postDelayed({ lastSig = null; refresh() }, 150)
+                }
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
     }

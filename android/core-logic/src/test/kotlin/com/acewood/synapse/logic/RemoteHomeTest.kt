@@ -60,3 +60,30 @@ class RemoteHomeTest {
         assertNull(RemoteHome.channel(emptyList(), 0, off))
     }
 }
+
+/** Review finding #3 (ChatGPT): the D-pad must only ever target a remote that belongs to the tuned room. */
+class RemoteHomeRoutingTest {
+    @Test fun eachRoomUsesOnlyItsOwnRemote() {
+        val rooms = Rooms.build(listOf(
+            Area("den", "Den", listOf("media_player.den_roku", "remote.den_roku")),
+            Area("kids_room", "Kids Room", listOf("media_player.juniors_roku", "remote.juniors_roku")),
+            Area("office", "Office", listOf("media_player.office_speaker")),   // no remote in this room
+        ))
+        val c = EntityCache().apply { applyStates(listOf(
+            Entity("media_player.den_roku", "playing", mapOf("supported_features" to 16385.0)),
+            Entity("media_player.juniors_roku", "playing", mapOf("supported_features" to 16385.0)),
+            Entity("media_player.office_speaker", "playing", mapOf("supported_features" to 16385.0)),
+            Entity("remote.den_roku", "on", emptyMap()), Entity("remote.juniors_roku", "on", emptyMap()),
+        )) }
+        for (i in rooms.indices) {
+            val ch = RemoteHome.channel(rooms, i, c)!!
+            val own = ch.room.remotes
+            if (ch.remoteId != null) assertTrue(ch.remoteId in own, "room ${ch.room.id} routed to foreign remote ${ch.remoteId}")
+            val call = MediaRemote.press(MediaRemote.Button.UP, ch.remoteId, ch.mediaId)
+            if (call != null) assertTrue(call.entityId in own || call.entityId == ch.mediaId)
+        }
+        val office = RemoteHome.channel(rooms, 2, c)!!
+        assertNull(office.remoteId)                       // never borrows the Den/Kids remote
+        assertNull(MediaRemote.press(MediaRemote.Button.UP, office.remoteId, office.mediaId))
+    }
+}
