@@ -81,6 +81,9 @@ class RemoteHomeView(
     private lateinit var dpad: View
     private lateinit var sideKeys: View
 
+    // house modes (first four that exist in HA)
+    private val modesRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+
     // room keys
     private val lightsKey = roomKey(GlassIcon.Kind.BULB, "Lights") { lightsTap() }
     private val tvKey = roomKey(GlassIcon.Kind.TV, "TV") { tvTap() }
@@ -101,6 +104,9 @@ class RemoteHomeView(
             addView(View(context), LinearLayout.LayoutParams(dp(10f), 1))
             addView(roomKeyView, LinearLayout.LayoutParams(0, dp(72f), 1f))
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18f) })
+        col.addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
+        col.addView(text(12f, faint, g.bodyBold(context)).apply { text = "HOUSE MODES"; letterSpacing = 0.14f; setPadding(dp(4f), 0, 0, dp(8f)) })
+        col.addView(modesRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48f)))
         col.addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
         col.addView(bottomBar())
         avatar.text = (cfg.ownerName.trim().firstOrNull() ?: 'S').uppercaseChar().toString()
@@ -130,6 +136,7 @@ class RemoteHomeView(
         lastSig = sig
         bindJarvis(cache)
         bindWeather(cache)
+        bindModes(cache)
         channel = cache?.let { RemoteHome.channel(rooms, index, it) }
         bindChannel(channel, rooms.isEmpty())
     }
@@ -157,6 +164,7 @@ class RemoteHomeView(
             val e = cache.get(id); append(id).append(e?.state).append(e?.attributes?.get("is_volume_muted")).append(e?.attributes?.get("app_name")).append(e?.attributes?.get("media_title"))
         }
         HomeView.JARVIS_SWITCHES.forEach { append(cache.get(it)?.state) }
+        HomeView.MODES.forEach { append(cache.get(it.first)?.state) }
         cache.byDomain("weather").firstOrNull()?.let { append(it.state).append(it.attributes["temperature"]) }
     }
 
@@ -190,6 +198,25 @@ class RemoteHomeView(
         jarvisChip.background = GradientDrawable().apply {
             cornerRadius = dp(14f).toFloat(); setColor(Glass.withAlpha(if (live) Glass.MINT else Glass.RED, 30))
             setStroke(dp(1f), Glass.withAlpha(if (live) Glass.MINT else Glass.RED, 120))
+        }
+    }
+
+    private fun bindModes(cache: EntityCache?) {
+        modesRow.removeAllViews()
+        val present = cache?.let { c -> HomeView.MODES.filter { c.get(it.first) != null }.take(4) }.orEmpty()
+        modesRow.visibility = if (present.isEmpty()) View.INVISIBLE else View.VISIBLE
+        present.forEachIndexed { i, (id, label, accent) ->
+            val on = cache?.get(id)?.state == "on"
+            if (i > 0) modesRow.addView(View(context), LinearLayout.LayoutParams(dp(8f), 1))
+            modesRow.addView(text(13f, if (on) ink else dim, if (on) g.bodyBold(context) else g.body(context)).apply {
+                text = label; gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(16f).toFloat()
+                    setColor(if (on) Glass.withAlpha(accent, 40) else Color.argb(8, 255, 255, 255))
+                    setStroke(dp(1f), if (on) Glass.withAlpha(accent, 170) else Color.argb(46, 130, 170, 255))
+                }
+                tap { cache?.let { HomeView.toggleMode(id, on, it) }; postDelayed({ lastSig = null; refresh() }, 150) }
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
     }
 

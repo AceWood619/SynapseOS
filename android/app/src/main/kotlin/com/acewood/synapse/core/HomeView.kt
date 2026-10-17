@@ -126,13 +126,7 @@ class HomeView(
         "binary_sensor.ps5_power" to "PS5", "binary_sensor.raspberry_pi_power_status" to "Pi power",
     )
 
-    /** House modes (HA input_booleans). Game mode runs its scripts when they exist. */
-    private val modes = listOf(
-        Triple("input_boolean.away_mode", "Away", Glass.BLUE), Triple("input_boolean.sleep_mode", "Sleep", Glass.VIOLET),
-        Triple("input_boolean.movie_mode", "Movie", Glass.INDIGO), Triple("input_boolean.quiet_mode", "Quiet", Glass.MINT),
-        Triple("input_boolean.guest_mode", "Guest", Glass.AMBER), Triple("input_boolean.party_mode", "Party", Glass.RED),
-        Triple("input_boolean.game_mode", "Game", Glass.MINT),
-    )
+    private val modes get() = MODES
 
     init {
         background = g.ground()
@@ -225,6 +219,21 @@ class HomeView(
 
     /** Jarvis kill switch: the HA helpers that let Jarvis listen and act. */
     companion object {
+        /** House modes (HA input_booleans). Game mode runs its scripts when they exist. */
+        val MODES = listOf(
+            Triple("input_boolean.away_mode", "Away", Glass.BLUE), Triple("input_boolean.sleep_mode", "Sleep", Glass.VIOLET),
+            Triple("input_boolean.movie_mode", "Movie", Glass.INDIGO), Triple("input_boolean.quiet_mode", "Quiet", Glass.MINT),
+            Triple("input_boolean.guest_mode", "Guest", Glass.AMBER), Triple("input_boolean.party_mode", "Party", Glass.RED),
+            Triple("input_boolean.game_mode", "Game", Glass.MINT),
+        )
+        /** Toggle a house mode; Game mode runs its own scripts when they exist. */
+        fun toggleMode(id: String, on: Boolean, cache: EntityCache) {
+            if (id == "input_boolean.game_mode") {
+                val script = if (on) "script.game_mode_off" else "script.game_mode_on"
+                if (cache.get(script) != null) { HaRepository.callService("script", "turn_on", listOf(script)); return }
+            }
+            HaRepository.toggle(listOf(id), !on)
+        }
         val JARVIS_SWITCHES = listOf("input_boolean.jarvis_voice", "input_boolean.dining_pc_jarvis_control", "input_boolean.dining_pc_jarvis_power")
         fun jarvisLive(cache: EntityCache?): Boolean = JARVIS_SWITCHES.any { cache?.get(it)?.state == "on" }
     }
@@ -468,13 +477,6 @@ class HomeView(
         }
     }
 
-    private fun toggleMode(id: String, on: Boolean, cache: EntityCache) {
-        if (id == "input_boolean.game_mode") {
-            val script = if (on) "script.game_mode_off" else "script.game_mode_on"
-            if (cache.get(script) != null) { HaRepository.callService("script", "turn_on", listOf(script)); return }
-        }
-        HaRepository.toggle(listOf(id), !on)
-    }
 
     private fun buildLightingFx(cache: EntityCache?) {
         fxWrap.removeAllViews()
