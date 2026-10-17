@@ -1,2 +1,5 @@
 android/compile-check/.gradle/
 android/compile-check/build/
+
+# Kotlin daemon logs
+.kotlin/
