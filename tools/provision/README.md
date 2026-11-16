@@ -6,13 +6,13 @@ Runs on the PC (HANDS). Takes a phone that's running SynapseOS and turns it into
 2. Put the HA long-lived token in a file **outside the repo**, e.g. `C:\secure\ha_token.txt`. Create a dedicated one in HA: Profile → Security → Long-lived tokens, named `synapse-<node>`.
 3. Run:
    ```powershell
-   python tools\provision\provision.py --adb C:\platform-tools\adb.exe --serial 10.0.0.166:5555 `
+   python tools\provision\provision.py --adb C:\platform-tools\adb.exe --serial <phone-ip>:5555 `
      --node-id livingroom-01 --room "Living Room" --ha-url http://homeassistant.local:8123 `
      --token-file C:\secure\ha_token.txt --device-owner
    ```
    Add `--extra-apk <SherpaTTS.apk>` to install a TTS engine at the same time.
 4. Read the PASS/FAIL summary. Then check by eye: the dashboard shows, dims to a clock after `--idle-seconds` (default 120), and wakes on touch or a hand over the top of the phone.
-5. Optional behaviour test: `python tools\provision\smoke_test.py --node-id livingroom-01 --ip 10.0.0.166 --ha-url http://homeassistant.local:8123 --speak`
+5. Optional behaviour test: `python tools\provision\smoke_test.py --node-id livingroom-01 --ip <phone-ip> --ha-url http://homeassistant.local:8123 --speak`
 
 ## Voice (Ava)
 Ava (github.com/brownard/Ava, Apache-2.0) turns the phone into an **ESPHome voice satellite**. HA's ESPHome integration auto-discovers it on port 6053.

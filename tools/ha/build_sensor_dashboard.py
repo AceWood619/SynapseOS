@@ -5,7 +5,7 @@ grouped by room (HA areas) and then by kind, plus the Synapse panel's own sensor
 Additive and idempotent: creates the dashboard `synapse-sensors` if missing, then overwrites ONLY that
 dashboard's config. It never edits other dashboards, automations or entities.
 
-Usage (PC):  python tools/ha/build_sensor_dashboard.py --ha http://10.0.0.165:8123 --token-file C:\\secure\\ha_token.txt
+Usage (PC):  python tools/ha/build_sensor_dashboard.py --ha http://homeassistant.local:8123 --token-file C:\\secure\\ha_token.txt
 Needs: pip install websocket-client
 """
 import argparse, json, re

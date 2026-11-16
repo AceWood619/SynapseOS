@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Behavioural smoke test for a provisioned Synapse node. Run from the PC:
-  python tools/provision/smoke_test.py --node-id livingroom-01 --ip 10.0.0.166 --ha-url http://homeassistant.local:8123
+  python tools/provision/smoke_test.py --node-id livingroom-01 --ip <phone-ip> --ha-url http://homeassistant.local:8123
 Reads the api_key from ~/.synapse/<node>.json and the HA token from SYNAPSE_HA_TOKEN.
 Each check triggers something and then READS BACK the effect.
 """

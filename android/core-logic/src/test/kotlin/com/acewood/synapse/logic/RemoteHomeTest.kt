@@ -11,7 +11,7 @@ class RemoteHomeTest {
     private val rooms = Rooms.build(listOf(
         Area("living_room", "Living Room", listOf("light.living_lamp")),
         Area("dining_room", "Dining Room", listOf("light.dining", "switch.dining_plug")),
-        Area("kids_room", "Kids Room", listOf("media_player.juniors_roku", "remote.juniors_roku", "light.kids_lamp")),
+        Area("kids_room", "Kids Room", listOf("media_player.kids_roku", "remote.kids_roku", "light.kids_lamp")),
     ))
 
     @Test fun wrapsChannelsBothWays() {
@@ -19,7 +19,7 @@ class RemoteHomeTest {
     }
 
     @Test fun startPrefersRememberedThenPlayingThenPanelRoom() {
-        val c = cache(Entity("media_player.juniors_roku", "playing", emptyMap()))
+        val c = cache(Entity("media_player.kids_roku", "playing", emptyMap()))
         assertEquals(1, RemoteHome.startIndex(rooms, "dining_room", "living_room", c))
         assertEquals(2, RemoteHome.startIndex(rooms, "gone_room", "living_room", c))
         assertEquals(0, RemoteHome.startIndex(rooms, null, "Living Room", cache()))
@@ -28,14 +28,14 @@ class RemoteHomeTest {
 
     @Test fun kidsRoomChannelDrivesRokuWithRemoteFallback() {
         val c = cache(
-            Entity("media_player.juniors_roku", "playing", mapOf("supported_features" to (16384 + 1).toDouble(), "app_name" to "HBO Max", "media_title" to "HBO Max")),
-            Entity("remote.juniors_roku", "on", emptyMap()),
+            Entity("media_player.kids_roku", "playing", mapOf("supported_features" to (16384 + 1).toDouble(), "app_name" to "HBO Max", "media_title" to "HBO Max")),
+            Entity("remote.kids_roku", "on", emptyMap()),
             Entity("light.kids_lamp", "off", emptyMap()),
         )
         val ch = RemoteHome.channel(rooms, 2, c)!!
         assertEquals("CH 3", ch.label); assertEquals(3, ch.count)
         assertEquals("HBO Max playing · lights off", ch.status)
-        assertEquals("media_player.juniors_roku", ch.mediaId); assertEquals("remote.juniors_roku", ch.remoteId)
+        assertEquals("media_player.kids_roku", ch.mediaId); assertEquals("remote.kids_roku", ch.remoteId)
         assertTrue(ch.isPlaying); assertTrue(ch.mediaOn); assertTrue(ch.hasDpad)
         assertTrue(ch.caps.showVolumeKeys)          // Roku remote backs VOL± even without player bits
         assertFalse(ch.anyLightOn)
@@ -54,7 +54,7 @@ class RemoteHomeTest {
     @Test fun statusWording() {
         assertEquals("All off", RemoteHome.channel(rooms, 0, cache(Entity("light.living_lamp", "off", emptyMap())))!!.status)
         assertEquals("1 light on", RemoteHome.channel(rooms, -3, cache(Entity("light.living_lamp", "on", emptyMap())))!!.status)
-        val off = cache(Entity("media_player.juniors_roku", "off", emptyMap()))
+        val off = cache(Entity("media_player.kids_roku", "off", emptyMap()))
         val ch = RemoteHome.channel(rooms, 2, off)!!
         assertFalse(ch.mediaOn); assertEquals("All off", ch.status)
         assertNull(RemoteHome.channel(emptyList(), 0, off))
@@ -66,14 +66,14 @@ class RemoteHomeRoutingTest {
     @Test fun eachRoomUsesOnlyItsOwnRemote() {
         val rooms = Rooms.build(listOf(
             Area("den", "Den", listOf("media_player.den_roku", "remote.den_roku")),
-            Area("kids_room", "Kids Room", listOf("media_player.juniors_roku", "remote.juniors_roku")),
+            Area("kids_room", "Kids Room", listOf("media_player.kids_roku", "remote.kids_roku")),
             Area("office", "Office", listOf("media_player.office_speaker")),   // no remote in this room
         ))
         val c = EntityCache().apply { applyStates(listOf(
             Entity("media_player.den_roku", "playing", mapOf("supported_features" to 16385.0)),
-            Entity("media_player.juniors_roku", "playing", mapOf("supported_features" to 16385.0)),
+            Entity("media_player.kids_roku", "playing", mapOf("supported_features" to 16385.0)),
             Entity("media_player.office_speaker", "playing", mapOf("supported_features" to 16385.0)),
-            Entity("remote.den_roku", "on", emptyMap()), Entity("remote.juniors_roku", "on", emptyMap()),
+            Entity("remote.den_roku", "on", emptyMap()), Entity("remote.kids_roku", "on", emptyMap()),
         )) }
         for (i in rooms.indices) {
             val ch = RemoteHome.channel(rooms, i, c)!!

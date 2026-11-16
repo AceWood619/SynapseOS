@@ -3,3 +3,7 @@ android/compile-check/build/
 
 # Kotlin daemon logs
 .kotlin/
+
+# Python bytecode
+__pycache__/
+*.pyc

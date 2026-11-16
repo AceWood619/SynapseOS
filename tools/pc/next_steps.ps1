@@ -5,7 +5,7 @@
 param(
   [string]$Repo   = 'C:\SynapseOS',
   [string]$Adb    = 'C:\platform-tools\adb.exe',
-  [string]$Serial = '10.0.0.166:5555',
+  [string]$Serial = $(if ($env:SYNAPSE_ADB_SERIAL) { $env:SYNAPSE_ADB_SERIAL } else { 'PHONE_IP:5555' }),  # or set SYNAPSE_ADB_SERIAL
   [string]$TokenFile = 'C:\secure\ha_token.txt',
   [string]$NodeId = 'livingroom-01',
   [string]$Room   = 'Living Room'
@@ -40,7 +40,8 @@ Write-Host "token file OK ($($token.Length) chars)"
 
 Step '2. Find Home Assistant (as seen from this PC)'
 $ha = $null
-foreach ($u in 'http://homeassistant.local:8123', 'http://10.0.0.7:8123') {
+$haCandidates = @('http://homeassistant.local:8123'); if ($env:SYNAPSE_HA_URL) { $haCandidates += $env:SYNAPSE_HA_URL }
+foreach ($u in $haCandidates) {
   try {
     $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 6 -Uri "$u/api/" -Headers @{ Authorization = "Bearer $token" }
     if ($r.StatusCode -eq 200) { $ha = $u; break }

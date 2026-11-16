@@ -11,7 +11,7 @@ SYNAPSE_HA_TOKEN env var or --token-file. Per-node secrets (api_key) are kept in
 
 Example (PowerShell):
   $env:SYNAPSE_HA_TOKEN = Get-Content C:\\secure\\ha_token.txt
-  python tools\\provision\\provision.py --serial 10.0.0.166:5555 --node-id livingroom-01 `
+  python tools\\provision\\provision.py --serial <phone-ip>:5555 --node-id livingroom-01 `
       --room "Living Room" --ha-url http://homeassistant.local:8123 --device-owner
 
 Every step is checked by reading the result back (not by exit codes).
@@ -98,7 +98,7 @@ def load_secrets(node):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--adb", default="adb", help="path to adb(.exe)")
-    ap.add_argument("--serial", default=None, help="adb serial, e.g. 10.0.0.166:5555")
+    ap.add_argument("--serial", default=None, help="adb serial, e.g. <phone-ip>:5555")
     ap.add_argument("--node-id", required=True)
     ap.add_argument("--room", required=True)
     ap.add_argument("--owner-name", default="", help="admin/owner display name for the home-screen greeting, e.g. Mason")

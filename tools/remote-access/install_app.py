@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Install an APK onto the Synapse panel over Wi-Fi from any authorized machine (dining PC / MacBook / RP5).
-  python install_app.py --ip 10.0.0.151 app.apk
+  python install_app.py --ip <phone-ip> app.apk
 Requires this machine's ADB key to be authorized on the panel (see README). Verifies the install by
 reading the package back, not just the adb exit code."""
 import argparse, subprocess, sys, re
