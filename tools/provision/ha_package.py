@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate a Home Assistant package for one Synapse node:
-  python tools/provision/ha_package.py --node-id livingroom-01 --ip 10.0.0.166 > synapse_livingroom_01.yaml
+  python tools/provision/ha_package.py --node-id livingroom-01 --ip <phone-ip> > synapse_livingroom_01.yaml
 Copy the output to <HA config>/packages/ (with `homeassistant: packages: !include_dir_named packages`
 in configuration.yaml) and add the printed secrets line to secrets.yaml. Then restart HA.
 

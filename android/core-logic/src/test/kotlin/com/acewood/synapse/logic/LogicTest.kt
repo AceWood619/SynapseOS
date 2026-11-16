@@ -400,7 +400,7 @@ class ProfilesTest {
         val salt = PinHash.newSalt()
         val p = Profiles(salt, emptyList(), null)
             .withProfile("admin", "Mason", Role.ADMIN, "1111")
-            .withProfile("user", "Riah", Role.USER, "2222")
+            .withProfile("user", "Alex", Role.USER, "2222")
             .withProfile("child", "Kid", Role.CHILD, "3333", Layout(orientation = "landscape", tileScale = 1.4f))
             .withProfile("guest", "Guest", Role.GUEST, "4444")
         assertEquals("Mason", p.resolve("1111")!!.name)
@@ -439,10 +439,10 @@ class RoomsTest {
         Area("master_bedroom", "Master bedroom", listOf(
             "light.bedroom", "light.cync_lan_694243630_22", "light.zz_cloud_bedroom_led_strip",
             "light.zz_cloud_mb_lamp_top", "switch.master_bedroom_jarvis_microphone",
-            "switch.led_strip_led_strip_mitm_mode", "media_player.riahs_room_50_onn_roku_tv")),
+            "switch.led_strip_led_strip_mitm_mode", "media_player.bedroom_50_onn_roku_tv")),
         Area("kids_room", "Kids Room", listOf(
             "light.cync_lan_694243630_188", "light.zz_cloud_kids_bedroom_light",
-            "switch.kids_bedroom_jarvis_microphone", "media_player.kids_room_juniors_roku")),
+            "switch.kids_bedroom_jarvis_microphone", "media_player.kids_room_kids_roku")),
         Area("dining_room", "Dining Room", listOf(
             "light.cync_lan_694243630_102", "light.zz_cloud_dining_room_light",
             "switch.dining_room_dining_room_windows_mute")),

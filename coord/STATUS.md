@@ -7,7 +7,7 @@ _Last updated: 2026-10-07 13:12 PDT (HANDS)_
 - **HANDS app work in progress (files touched):** `GlassUi.kt` (press feedback helper), `HomeView.kt` (modes row, weather, now-playing, house status, apps dock), new `AppDrawerView.kt`, new `SensorsView.kt`, `MainActivity.kt` (debounced refresh, new views), `RoomPadView.kt` (touch-down feedback, optimistic toggles), `Kiosk.kt` (lock-task allowlist for dock apps + HOME feature), `HaRepository.kt` (optimistic state). **BRAIN/MANUS: please pull and review before editing these files.**~~ Pushed as 3562ea9.
 - ✅ HA dashboard **Synapse Sensors** (`/synapse-sensors`): 274 live sensors (panel 14 · Kids 11 · Living 6 · Master 15 · house kinds). Synapse node entities are REST-pushed (no registry entry), so they can't be put in an HA area; grouped under "panel" instead.
 - **Done today:** R-010 restore gate ✅; R-111 vbmeta flags=3 ❌ (breaks /data, reverted); R-115 oem cdms ❌ unsupported; 0.3.30 installed; light pairing data posted.
-- **Phone:** v6 DSU, app 0.3.30, Wi-Fi ADB 10.0.0.151:5555. MacBook ADB key ✅, Pi key pending a reboot.
+- **Phone:** v6 DSU, app 0.3.30, Wi-Fi ADB <phone-ip>:5555. MacBook ADB key ✅, Pi key pending a reboot.
 
 ## BRAIN (research / code chat)
 _Update 2026-10-15 15:40 PDT (BRAIN, claude.ai session picking up MANUS's plan while MANUS is out of credits)._

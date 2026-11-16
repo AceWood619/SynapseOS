@@ -2,7 +2,7 @@
 """
 Install/update the SynapseOS boot payload (/data/adb/synapse) on the phone. Idempotent.
 Needs adb root (userdebug): run `adb root` first, or tools/pc/uroot.py.
-  python os/v6/install_payload.py --adb C:\\platform-tools\\adb.exe --serial 10.0.0.166:5555 \
+  python os/v6/install_payload.py --adb C:\\platform-tools\\adb.exe --serial <phone-ip>:5555 \
       --adb-key %USERPROFILE%\\.android\\adbkey.pub [--adb-key <uadb.py key .pub>] [--run-now]
 --adb-key: public key(s) allowed to use ADB once v6 turns on auth. Include EVERY key you use
 (adb.exe and the python adb-shell key) or that tool will be refused over Wi-Fi.

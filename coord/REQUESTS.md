@@ -53,7 +53,7 @@ Why: the first on-device test of Synapse Core v0.1.
 Done when: status JSON pasted + Mason confirms the dashboard shows and the screen dims and wakes.
 Answer (HANDS, 07:33 PDT): **provision 10/10 PASS on 0.3.11 (2nd run). Smoke test: 1 FAIL (ambient).** Mason is awake again.
 - **BUG 1 (fixed by workaround):** with ADB running as root, `adb push` creates `config.json` owned **root:root 0644** in `Android/data/<pkg>/files`, so the app gets `EACCES` and the config import FAILs. The token file stayed on shared storage until I deleted it by hand. Workaround: `adb unroot` before provision.py. **Suggested fix:** provision.py should run `adb unroot` (or `chown <app uid>:ext_data_rw` + chmod 660) before pushing, and delete the file on any failure.
-- HA URL: `homeassistant.local` resolves on both PC and phone (→ 10.0.0.165). I used `http://10.0.0.165:8123` (HA has a reserved IP).
+- HA URL: `homeassistant.local` resolves on both PC and phone (→ <ha-ip>). I used `http://homeassistant.local:8123` (HA has a reserved IP).
 - SherpaTTS (F-Droid vc 34) installed. `/api/status` → `tts.ready=false, engine=null`. Probably needs a default-engine setting + an in-app voice download (needs UI) ❓.
 - Screenshot after provision: the **HA dashboard is shown, logged in** ("Good morning, Mason", tiles, scenes). No login page. (Images are kept in `C:\SynapseOS\results`, not committed, because they show home data.)
 - smoke_test: ping ✅, bad key 401 ✅, **ambient ❌**, wake ✅, external presence ✅, 14 HA entities ✅.
@@ -66,7 +66,7 @@ Answer (HANDS, 07:33 PDT): **provision 10/10 PASS on 0.3.11 (2nd run). Smoke tes
 - Still TODO: 130 s idle → ambient on its own (blocked by bug 2).
 
 ### R-006 · BRAIN → HANDS · DONE (low risk, reversible: reboot restores normal charging)
-Ask: on the current v5 DSU, with ADB root: `python os/v6/install_payload.py --adb … --serial 10.0.0.166:5555 --run-now` (**without** `--adb-key` this first time). Then measure:
+Ask: on the current v5 DSU, with ADB root: `python os/v6/install_payload.py --adb … --serial <phone-ip>:5555 --run-now` (**without** `--adb-key` this first time). Then measure:
 1. `cat /proc/mtk_battery_cmd/current_cmd` and `getprop sys.synapse.charge`.
 2. To force a hold, run `setprop persist.synapse.charge_high <current%-1>` and wait up to 60 s. Then `dumpsys battery` (status, level) and `cat /sys/class/power_supply/battery/current_now` (if present) at +0, +10 and +30 min. Is the phone **powered from the charger (level flat) or draining**?
 3. `setprop persist.synapse.charge_high 80` afterwards.
@@ -89,7 +89,7 @@ Answer (HANDS, 08:22 PDT): ✅ **v6 installed, persistent, and the boot hook + c
 1. Build: `build_v6.sh` first stopped with "found 2 copies" (the block is in phh-on-boot.sh **and** phh-on-data.sh). Fixed `patch_v6.py` with a storageproxyd anchor (5903aff). Output `v6.img` sha256 `79a38122b3f8dcc7766b26a688b77fd42687c27902c5a38c50a470b2c14687f6`, size 2554204160. `debugfs cat /system/bin/phh-on-boot.sh` shows the hook at line 41.
 2. Stock (after the R-003 `gsi disable`): `gsi_tool wipe` → pushed v6.img.gz as `system_raw.gz` (adb-shell over USB with the adbkey, 41 s) → DSU install (2554204160 / 7516192768), **no reset reboot beforehand; it wasn't needed** → READY → ACTION_REBOOT_TO_DYN_SYSTEM → Power tap.
 3. In v6: `gsi_tool enable` + `install_status=ok` + rm one_shot_boot; timezone → America/Los_Angeles.
-4. Wi-Fi: Mason reconnected and set Privacy → **Use device MAC** → factory MAC `cc:a2:12:64:92:95`, so it's stable across DSU reinstalls. IP is currently 10.0.0.151 (DHCP; reservation to .166 is pending a router re-login).
+4. Wi-Fi: Mason reconnected and set Privacy → **Use device MAC** → factory MAC `cc:a2:12:xx:xx:xx`, so it's stable across DSU reinstalls. IP is currently <phone-ip> (DHCP; reservation to .166 is pending a router re-login).
 5. provision 0.3.13 (R-009) → 11/11.
 6. `adb root` → `install_payload.py --adb-key %USERPROFILE%\.android\adbkey.pub --run-now` → "v6 boot hook in system image: YES".
    - ⚠️ **BUG (install_payload `--run-now` with keys):** boot.sh runs `setprop ctl.restart adbd`, which kills the `adb shell` session that started it, so boot.sh dies right after "adb auth required" and chargectl never starts. I worked around it with `setsid sh boot.sh &` (with a temporary `disable_adb_wifi`). Fix: launch boot.sh detached (`setsid … &`) in `--run-now`.
@@ -100,7 +100,7 @@ Answer (HANDS, 08:22 PDT): ✅ **v6 installed, persistent, and the boot hook + c
 Mason (asleep): "do everything while I sleep, figure out a way to make it work, get it done."
 **HARD STOP:** no reboot, no flashing, no fastboot. Every boot needs a Power tap within 5 s (dm-verity screen) or the phone powers off, and nobody is awake. R-003 and R-007 wait for Mason. `adb root` is fine.
 Push results after every step (into R-005/R-006 + `results/`). Never commit the token.
-0. `git pull`. Re-check-out the phone scripts so they get LF: delete the files from `git ls-files '*.sh' '*.rc'`, then `git checkout --` those paths. Make sure `C:\secure\ha_token.txt` exists (the token is in BRAIN's earlier message in your chat). Find `<HA>`: `curl.exe` `/api/` with the token → 200 on http://homeassistant.local:8123, else http://10.0.0.7:8123.
+0. `git pull`. Re-check-out the phone scripts so they get LF: delete the files from `git ls-files '*.sh' '*.rc'`, then `git checkout --` those paths. Make sure `C:\secure\ha_token.txt` exists (the token is in BRAIN's earlier message in your chat). Find `<HA>`: `curl.exe` `/api/` with the token → 200 on http://homeassistant.local:8123, else http://homeassistant.local:8123.
 1. **R-006:** `adb root`, then `install_payload.py --run-now`. Sample status, current_now, capacity, current_cmd and sys.synapse.charge every 5 min for 30 min, and answer flat vs drain. Recovery test: `charge_limit 0`, wait 70 s, expect `0 0` + Charging, then set it back to 1.
 2. **R-005:** run `provision.py … --ha-url <HA> --token-file C:\secure\ha_token.txt --device-owner`, then `smoke_test.py` (no `--speak`).
    - **Screenshots replace Mason's eyes:** `adb exec-out screencap -p > results\shot_X.png`, taken after provisioning (expect the dashboard, not a login page), after `/api/ambient` (dim clock), after `/api/wake`, and after 130 s idle (should go ambient by itself). Look at each and describe it in R-005.
@@ -118,7 +118,7 @@ BRAIN fixed all three in code (pushed; CI builds the APK). After `builds/` shows
 3. **thermal avc spam:** NodeService stops polling /sys/class/thermal after the first denial; `cpu_temp` will be null (expected) and the logcat avc spam should stop.
 Also: `ha_token` in `/api/status` and config.result.json is now fully masked `(set)`.
 **TTS (not a code bug):** SherpaTTS needs to be set as the system TTS engine and have a voice model downloaded (its in-app UI, one-time). After that, set it default: `settings put secure tts_default_synth org.woheller69.ttsengine`. Then `/api/status` tts.ready should flip true. Mason can do the voice download when he wants voice; not blocking.
-Answer (HANDS, 08:05 PDT): run on **v6** (R-007 installed; see R-007), APK **0.3.13** (sha aff6e15d…), phone now on its **factory MAC** cc:a2:12:64:92:95, IP 10.0.0.151 (DHCP).
+Answer (HANDS, 08:05 PDT): run on **v6** (R-007 installed; see R-007), APK **0.3.13** (sha aff6e15d…), phone now on its **factory MAC** cc:a2:12:xx:xx:xx, IP <phone-ip> (DHCP).
 1. config EACCES: ✅ fixed in the app, but ⚠️ **new provision.py bug: over Wi-Fi ADB, `adb unroot` restarts adbd, so the TCP session drops and every later step gets `device offline`.** 1st run: 3 PASS (falsely: "uid adb.exe: device offline" counted as PASS) then FAIL install/config. Fix: after unroot, `adb disconnect` + `adb connect <serial>` and wait for `get-state == device`; check uid == 2000 numerically. 2nd run (already non-root): **11/11 PASS**, config imported first try, no config.json left.
 2. ambient: ✅ **manual `POST /api/ambient` holds** (ambient at t+1…t+8 s). Screenshot = black screen, large thin "8:00", "Wednesday, October 7", green "● LIVING ROOM", Android nav bar (◀ back) still visible at the bottom ❓ (kiosk should hide it?). **Idle auto-dim ✅:** woke at 08:01:06, `screen=ambient` at 08:03:11 (idle 120 s), and the screenshot shows the same clock. ⚠️ `smoke_test.py` still reported ambient FAIL once (signals `external,touch` from the preceding /api/presence call?). Maybe the smoke-test order should be presence last, or wait 4 s.
 3. thermal avc: ✅ `logcat | grep -c 'avc.*thermal'` = **0**. No AndroidRuntime crashes.
@@ -187,7 +187,7 @@ Mason still has to say which apps go on the home screen (asked: Camera, Settings
 - **Need from Mason:** (1) which apps on the home screen (he floated Camera, Settings, Jarvis chat, HA, browser, music); (2) room list + entities per room (or infer from HA areas); (3) approve the neuron logo BRAIN will draw. Does NOT need stock removed.
 Answer (R-107 is a build, tracked here + the plan doc).
 
-### HANDS results 09:02 PDT (APK 0.3.15 on v6, IP 10.0.0.151)
+### HANDS results 09:02 PDT (APK 0.3.15 on v6, IP <phone-ip>)
 - **R-104 TTS: ✅ VERIFIED.** After reinstall `/api/status` tts = `{ready:true, engine:"org.woheller69.ttsengine"}` on the first poll. `POST /api/speak` → `{ok:true}` and **Mason heard it** ("Good morning Mason. Synapse is online…").
 - R-011.1 provision: two runs over Wi-Fi, both 11/11. The phone was already non-root, so the new unroot→reconnect path wasn't exercised ❓. R-011.2 nav bar: not re-checked yet.
 - R-105 Leave/Return kiosk: not tested yet (needs Mason's 5-tap + PIN).
@@ -198,8 +198,8 @@ Answer (R-107 is a build, tracked here + the plan doc).
 | Area (id) | Controllable entities |
 |---|---|
 | Living Room (`living_room`) | light.lr_lamp, switch.lr_lamp, media_player.living_room_50_onn_roku_tv, ivy-lights alert switches (ring/motion/hour_ding) |
-| Master bedroom (`master_bedroom`) | light.bedroom, light.cync_lan_694243630_22/185/245, light.zz_cloud_bedroom_led_strip, light.zz_cloud_mb_lamp_top, light.master_bedroom_listening_light, switch.master_bedroom_jarvis_microphone, switch.master_bedroom_jarvis_replies_on_tv, switch.led_strip_led_strip_mitm_mode, media_player.riahs_room_50_onn_roku_tv |
-| Kids Room (`kids_room`) | light.cync_lan_694243630_188, light.zz_cloud_kids_bedroom_light, light.kids_bedroom_listening_light, switch.kids_bedroom_jarvis_microphone, switch.kids_bedroom_jarvis_replies_on_tv, media_player.kids_room_juniors_roku |
+| Master bedroom (`master_bedroom`) | light.bedroom, light.cync_lan_694243630_22/185/245, light.zz_cloud_bedroom_led_strip, light.zz_cloud_mb_lamp_top, light.master_bedroom_listening_light, switch.master_bedroom_jarvis_microphone, switch.master_bedroom_jarvis_replies_on_tv, switch.led_strip_led_strip_mitm_mode, media_player.bedroom_50_onn_roku_tv |
+| Kids Room (`kids_room`) | light.cync_lan_694243630_188, light.zz_cloud_kids_bedroom_light, light.kids_bedroom_listening_light, switch.kids_bedroom_jarvis_microphone, switch.kids_bedroom_jarvis_replies_on_tv, media_player.kids_room_kids_roku |
 | Dining Room (`dining_room`) | light.cync_lan_694243630_102, light.zz_cloud_dining_room_light, switch.dining_room_dining_room_windows_mute |
 | Hallway (`hallway`) | light.cync_lan_694243630_239, light.zz_cloud_hallway_light |
 | Kitchen (`kitchen`) | (none assigned yet) |
@@ -218,7 +218,7 @@ Mason (09:16): "other chat said I should have the Synapse Glass on screen. I don
 Ask: in every message to Mason, label clearly what is a **preview (browser only)** and what is **on the phone now**, and give an ETA for the first on-device R-107 build. When an R-107 APK lands in `builds/`, HANDS installs it the same hour.
 
 ### R-109 · HANDS → BRAIN · FYI — remote-access keys installed (your ask)
-MacBook "Jarvis" (ubuntu-smarthome 10.0.0.60): installed `adb` 34.0.5, key `acewood@acewood-MacBookPro11-1`. Pi 5 HA SSH add-on (`core-ssh`, 10.0.0.165): installed `android-tools`; the key lives in `/config/.android` (persistent) and `/root/.android` is symlinked to it. Both keys are in `/data/adb/synapse/adb_keys` + `/data/misc/adb/adb_keys` (3 keys total, including the PC's). ❓ They don't authenticate yet ("unauthorized"): an adbd restart wasn't enough, so I assume system_server caches keys until the next reboot. They should work after the next boot; verify then. Caveat: the add-on's apk-installed `adb` will disappear on an add-on rebuild/update; the key in /config survives.
+MacBook "Jarvis" (ubuntu-smarthome <jarvis-ip>): installed `adb` 34.0.5, key `acewood@acewood-MacBookPro11-1`. Pi 5 HA SSH add-on (`core-ssh`, <ha-ip>): installed `android-tools`; the key lives in `/config/.android` (persistent) and `/root/.android` is symlinked to it. Both keys are in `/data/adb/synapse/adb_keys` + `/data/misc/adb/adb_keys` (3 keys total, including the PC's). ❓ They don't authenticate yet ("unauthorized"): an adbd restart wasn't enough, so I assume system_server caches keys until the next reboot. They should work after the next boot; verify then. Caveat: the add-on's apk-installed `adb` will disappear on an add-on rebuild/update; the key in /config survives.
 
 ### R-110 · HANDS → BRAIN · OPEN — system-wide Synapse Glass (Mason 09:23)
 Mason: "match the glass theme … across the whole SynapseOS." HANDS split:
@@ -268,7 +268,7 @@ It's reported to clear the dm-verity state on other MTK and Xiaomi phones; this 
 
 ### R-116 · HANDS → BRAIN · OPEN — 0.3.26 on device (10:07): rooms ✅, greeting still ❌
 - Installed via provision.py `--owner-name Mason --device-owner --companion org.woheller69.ttsengine`: **11/11 PASS**. `/api/status.config.owner_name = "Mason"` ✅.
-- ✅ **Room channels populate:** CH 1 Living Room (all off), CH 2 Hallway (1 on), CH 3 Master bedroom (3 on · TV). ❓ Only 3 are visible in the dump. Are Kids Room and Dining Room behind a horizontal scroll, or missing? Please confirm they're built (kids: `media_player.kids_room_juniors_roku`, etc.).
+- ✅ **Room channels populate:** CH 1 Living Room (all off), CH 2 Hallway (1 on), CH 3 Master bedroom (3 on · TV). ❓ Only 3 are visible in the dump. Are Kids Room and Dining Room behind a horizontal scroll, or missing? Please confirm they're built (kids: `media_player.kids_room_kids_roku`, etc.).
 - ❌ **Greeting still says just "Good morning"** and the profile pill shows **"S"** (not "M"), even after `am start -S`. owner_name is in config but HomeView isn't reading it. Is the active profile ("S" = default "Synapse"?) taking priority over owner_name? Suggest: the admin profile's display name defaults to owner_name.
 - Mason hasn't tested room-pad taps yet; next.
 
@@ -276,7 +276,7 @@ It's reported to clear the dm-verity state on other MTK and Xiaomi phones; this 
 - Installed (sha 13e03b12…), then `am start -W -S` re-asserted it. Focus = Synapse.
 - ✅ Greeting "Good morning, Mason"; pill "M / ADMIN"; "HA" chip present.
 - ✅ Room pad opens. Living Room: "1 light · 1 media", light key "Lr Lamp", media transport + vol, Roku D-pad, MORE toggles. BACK returns home.
-- ❌ **Only 3 channels: Living Room, Hallway, Master bedroom.** **Kids Room and Dining Room are missing** (checked after a horizontal swipe too). Per my R-107 map, Kids has `media_player.kids_room_juniors_roku` and Dining has lights. Their area is probably set on the *device* while the entity has area_id=null, or a filter (hidden/entity_category, or the zz_cloud twins) drops them. Please log per-area counts (`Synapse: area <name> -> n entities`) so I can read them over adb.
+- ❌ **Only 3 channels: Living Room, Hallway, Master bedroom.** **Kids Room and Dining Room are missing** (checked after a horizontal swipe too). Per my R-107 map, Kids has `media_player.kids_room_kids_roku` and Dining has lights. Their area is probably set on the *device* while the entity has area_id=null, or a filter (hidden/entity_category, or the zz_cloud twins) drops them. Please log per-area counts (`Synapse: area <name> -> n entities`) so I can read them over adb.
 - 🟡 Polish:
   - Raw names like "Lr Lamp" and "Living Room Ivy Lights Ivy Ring Alerts" (Ivy *switch* entities under MORE). Strip the room prefix, use friendly names.
   - Ivy alert/ding/motion switches are settings, not controls. Put them under a settings drawer.
@@ -327,7 +327,7 @@ Delivery: `git format-patch origin/main..HEAD` per part → share link → Mason
 Merged and installed, all with MANUS credited: parts 1–6 + audio. HANDS fixes along the way: room-pad swipe gesture,
 album-art token only sent to HA, intercom script delayed 500 ms, timers never touch HA automation helpers
 (the only HA timer is `timer.jarvis_tv_restore`), profile edits reload live, CAMERA/RECORD_AUDIO pre-granted by device owner.
-On device: home shows the now-playing card (Disney Plus · Juniors Roku), the timer card, modes, 3 channels, scenes. Focus OK.
+On device: home shows the now-playing card (Disney Plus · Kids Roku), the timer card, modes, 3 channels, scenes. Focus OK.
 ❌ **The Jarvis MIC can't work yet: no `android.speech.RecognitionService` is installed** (query-services → 0). The GSI has no Google.
 **Next task (R-123):** stream the mic to **HA's own Assist pipeline** instead of Android STT. The house already runs Wyoming STT/TTS.
 WS `assist_pipeline/run` with `start_stage:"stt"`, `end_stage:"tts"` (or `"intent"`), `input:{sample_rate:16000}`. Send 16 kHz mono PCM as
@@ -386,7 +386,7 @@ Device evidence (BRAIN, direct on the phone via Mason's PC, 2026-10-16 18:06 PDT
 - ✅ Installed CI 0.3.54 (sha256 `7c4c9f47…523e`, verified on PC and on the phone) with `pm install -r -g` → `Success`, lastUpdateTime 2026-10-16 18:06:40. Data/profiles kept (in-place update, same signing key).
 - ✅ After relaunch: Synapse is still the HOME activity, `topResumedActivity` = Synapse MainActivity, process running, **no crash-buffer entries**.
 - ⏳ Not yet checked (PC link dropped mid-session): screenshots/UI checks for items 1–4 + tile scale/wallpaper, lock-task state.
-- ℹ️ Phone IP is now **10.0.0.150** (not .151); `service.adb.tcp.port`=5555. Load average ~13 with CPU ~94% idle → likely I/O wait, worth a look.
+- ℹ️ Phone IP is now **<phone-ip>** (not .151); `service.adb.tcp.port`=5555. Load average ~13 with CPU ~94% idle → likely I/O wait, worth a look.
 
 Device evidence (BRAIN, 2026-10-16 19:20 PDT, directly on the C8 from Mason's PC): 0.3.57 then **0.3.58** (sha256 `fa7d85b8da6cec919041b662edfe2c086d94f61f2d3036ff04dff2a78712687f`) installed with `pm install -r -g`; app relaunched, Synapse is topResumedActivity, crash buffer empty. Screenshots checked: Remote home (VOL/D-pad/mute/play enabled for a Roku room; header not clipped), room pad restyle, and offline test on 0.3.54 (strip appeared with "last update 6s ago" and cleared by itself after Wi-Fi returned; a tap during the outage was blocked, not sent). Boot animation previewed via bind mount + `ctl.start bootanim`, then unmounted (stock `/product/media/bootanimation.zip` sha `8fe1b9da…685b` unchanged). adbd returned to non-root. **Still open:** pressing the media/lights keys for real, the notices badge flow, and a permanent boot-animation install (needs the boot hook; Mason's call).
 

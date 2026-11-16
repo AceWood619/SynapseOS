@@ -1,7 +1,7 @@
 # Findings: quick facts each chat must know
 Newest first. One or two lines each, with a link to the detail.
 
-- ✅ **USB ADB to the C8 now needs a signed key.** `uadb.py` (rsa_keys=None) fails with DeviceAuthError. Use `tools/pc/kadb.py` (libusb + the PC's `~/.android/adbkey`). Stock `adb.exe` still can't see USB (WinUSB/Zadig). Phone Wi-Fi IP is currently **10.0.0.150**. (BRAIN, 2026-10-16)
+- ✅ **USB ADB to the C8 now needs a signed key.** `uadb.py` (rsa_keys=None) fails with DeviceAuthError. Use `tools/pc/kadb.py` (libusb + the PC's `~/.android/adbkey`). Stock `adb.exe` still can't see USB (WinUSB/Zadig). Phone Wi-Fi IP is currently **<phone-ip>**. (BRAIN, 2026-10-16)
 - ⚠️ **Two different APKs both claimed 0.3.54 / versionCode 54** (one installed 10-14, sha `7b8e…`; CI's sha `7c4c…`). Always compare SHA-256 with `builds/synapse-core-latest.json`, never trust versionName. (BRAIN)
 - ⚠️ **Don't run `adb start-server`/`kill-server` through the desktop shell tool** — the spawned daemon holds the pipe and the call hangs. Start it with `Start-Process -WindowStyle Hidden` + redirected output. (BRAIN)
 

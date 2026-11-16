@@ -44,7 +44,7 @@ Roles map to the Level 0/1/2 security model:
 | Role | Max action level | UI | Powers |
 |---|---|---|---|
 | **Admin** (Mason) | 2 (locks/garage/alarm) | full | everything + manage profiles/settings/nodes |
-| **User** (e.g. Riah) | 2 | full | all controls; can't edit Synapse settings/profiles |
+| **User** (e.g. a partner) | 2 | full | all controls; can't edit Synapse settings/profiles |
 | **Child** | 0 (lights/media/temp) | simplified, big tiles | no cameras/doors/security; limited apps; own orientation |
 | **Guest** | 0, shared rooms | simplified | lights/media/temp only; minimal apps; the default/locked view |
 - Each profile carries its own **orientation + layout** (home apps, visible rooms, accent, tile scale).
