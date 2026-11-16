@@ -13,7 +13,7 @@ Date: 2026-10-17 · From: camera-hack workstream · Status: LIVE in Home Assista
 
 ## How it stays up
 - Camera runs stock firmware, rooted, on Wi-Fi, reboot-proof. Parent monitor still works.
-- Sensor bridge: `jarvis-vm64cam.service` (systemd, Restart=always) on the Jarvis box (10.0.0.60)
+- Sensor bridge: `jarvis-vm64cam.service` (systemd, Restart=always) on the Jarvis box (always-on LAN host)
   polls the camera every 2 min and publishes via HA's `mqtt.publish` (no broker creds).
 
 ## For SynapseOS
